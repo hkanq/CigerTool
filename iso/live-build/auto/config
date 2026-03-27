@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+
+lb config noauto \
+  --mode debian \
+  --architectures amd64 \
+  --distribution bookworm \
+  --binary-images iso-hybrid \
+  --archive-areas "main contrib non-free non-free-firmware" \
+  --bootappend-live "boot=live components noeject hostname=cigertool username=root systemd.mask=getty@tty1.service console=tty1" \
+  --linux-flavours amd64

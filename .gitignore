@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+dist/
+iso/live-build/cache/
+iso/live-build/chroot/
+iso/live-build/binary*
+iso/live-build/config/includes.chroot/opt/cigertool/
+cigertool.log
