@@ -1,0 +1,112 @@
+name: Build CigerTool WinPE ISO
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-winpe-iso:
+    runs-on: windows-latest
+    timeout-minutes: 150
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup MSYS2 (GRUB toolchain)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MSYS
+          update: true
+          install: >-
+            grub
+
+      - name: Log environment
+        shell: powershell
+        run: |
+          $PSVersionTable
+          python --version
+          dism /English /Get-CurrentEdition
+          if (Test-Path "C:\msys64\usr\bin\bash.exe") {
+            C:\msys64\usr\bin\bash.exe -lc "grub-mkstandalone --version"
+          }
+
+      - name: Verify GRUB toolchain
+        shell: powershell
+        run: |
+          if (-not (Test-Path "C:\msys64\usr\bin\bash.exe")) {
+            throw "MSYS2 bash bulunamadi."
+          }
+          C:\msys64\usr\bin\bash.exe -lc "command -v grub-mkstandalone"
+
+      - name: Install Python dependencies
+        shell: powershell
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Run unit tests
+        shell: powershell
+        run: |
+          python -m unittest discover -s tests -p "test_*.py"
+
+      - name: Install ADK and WinPE Add-on
+        shell: powershell
+        run: |
+          .\build\scripts\install_adk.ps1
+
+      - name: Build desktop application
+        shell: powershell
+        run: |
+          .\build\scripts\build_app.ps1
+
+      - name: Build WinPE ISO
+        shell: powershell
+        run: |
+          .\build\scripts\build_winpe_iso.ps1 -OutputIso "artifacts\CigerTool-by-hkannq.iso" -RequirePrebootMenu
+
+      - name: Validate ISO artifact
+        shell: powershell
+        run: |
+          if (-not (Test-Path "artifacts\CigerTool-by-hkannq.iso")) {
+            throw "ISO artifact olusmadi."
+          }
+          Get-Item "artifacts\CigerTool-by-hkannq.iso" | Format-List Name,Length,LastWriteTime
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CigerTool-by-hkannq.iso
+          path: |
+            artifacts/CigerTool-by-hkannq.iso
+            artifacts/CigerTool-by-hkannq.iso.sha256
+            artifacts/CigerTool-by-hkannq.iso.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cigertool-build-logs
+          path: artifacts/logs
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Publish release asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/CigerTool-by-hkannq.iso

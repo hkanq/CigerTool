@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cigertool"
+version = "0.1.0"
+description = "CigerTool by hkannq - WinPE tabanli disk klonlama ve kurtarma platformu"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+  { name = "hkannq" }
+]
+dependencies = [
+  "PySide6==6.10.2",
+  "psutil>=6.0,<7.0",
+]
+
+[project.optional-dependencies]
+build = [
+  "pyinstaller>=6.7,<7.0",
+]
+
+[project.scripts]
+cigertool = "cigertool.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["cigertool*"]
+
+[tool.setuptools.package-data]
+cigertool = ["assets/*"]
