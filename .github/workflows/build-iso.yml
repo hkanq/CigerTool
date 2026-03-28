@@ -56,12 +56,6 @@ jobs:
           echo "ENV: $MSYSTEM"
           pacman --noconfirm -S --needed mingw-w64-x86_64-mtools
 
-      - name: Expose MSYS2 toolchain on PATH
-        shell: powershell
-        run: |
-          "C:\msys64\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
       - name: Log environment
         shell: powershell
         run: |
@@ -84,16 +78,19 @@ jobs:
           which mformat || true
 
       - name: Verify ISO toolchain
-        shell: powershell
+        shell: msys2 {0}
         run: |
-          $bash = "C:\msys64\usr\bin\bash.exe"
-          if (-not (Test-Path $bash)) {
-            throw "MSYS2 bash bulunamadi."
-          }
-          & $bash -lc "export PATH=/usr/bin:/mingw64/bin:`$PATH; echo MSYSTEM=`$MSYSTEM; echo PATH=`$PATH; which xorriso; which mcopy; which mformat; which mmd"
-          if ($LASTEXITCODE -ne 0) {
-            throw "MSYS ISO toolchain bash uzerinden dogrulanamadi."
-          }
+          export PATH=/usr/bin:/mingw64/bin:$PATH
+          echo "MSYSTEM=$MSYSTEM"
+          echo "PATH=$PATH"
+          which bash
+          which xorriso
+          which mcopy
+          which mformat
+          which mmd
+          xorriso --version || true
+          mcopy -V || true
+          echo "CIGERTOOL_MSYS_BASH=$(cygpath -w "$(which bash)")" >> "$GITHUB_ENV"
 
       - name: Install Python dependencies
         shell: powershell

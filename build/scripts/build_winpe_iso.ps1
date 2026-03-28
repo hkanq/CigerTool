@@ -86,17 +86,20 @@ function Find-ToolPath {
 
 function Resolve-MsysBash {
     $candidates = @(
-        $env:CIGERTOOL_MSYS_BASH,
-        "C:\msys64\usr\bin\bash.exe",
-        "C:\tools\msys64\usr\bin\bash.exe"
+        $env:CIGERTOOL_MSYS_BASH
     ) | Where-Object { $_ }
+
+    $command = Get-Command bash.exe -ErrorAction SilentlyContinue
+    if ($command -and $command.Source) {
+        $candidates += $command.Source
+    }
 
     foreach ($candidate in $candidates) {
         if (Test-Path $candidate) {
             return $candidate
         }
     }
-    throw "MSYS2 bash bulunamadi. xorriso ve mtools bash -lc ile calistirilir."
+    throw "MSYS2 bash bulunamadi. Workflow, msys2 shell icinden CIGERTOOL_MSYS_BASH degiskenini saglamalidir."
 }
 
 function Convert-ToMsysPath {
