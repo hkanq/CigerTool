@@ -9,10 +9,6 @@ OUTPUT_ISO="$DIST_DIR/cigertool.iso"
 BUILD_LOG="$DIST_DIR/build.log"
 CHECKSUM_FILE="$DIST_DIR/cigertool.iso.sha256"
 CHROOT_DIR="$LB_DIR/chroot"
-INVALID_SECURITY_SUITE_PART1="bookworm"
-INVALID_SECURITY_SUITE_PART2="updates"
-INVALID_SECURITY_SUITE="${INVALID_SECURITY_SUITE_PART1}/${INVALID_SECURITY_SUITE_PART2}"
-CORRECT_SECURITY_SUITE="bookworm-security"
 
 require_tool() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -48,14 +44,9 @@ rm -f "$OUTPUT_ISO" "$BUILD_LOG" "$CHECKSUM_FILE"
 
 pushd "$LB_DIR" >/dev/null
   lb clean --purge || true
+  rm -rf config/cache
+  rm -rf cache
   ./auto/config
-  while IFS= read -r -d '' file; do
-    sed -i "s#${INVALID_SECURITY_SUITE}#${CORRECT_SECURITY_SUITE}#g" "$file"
-  done < <(grep -RIlZ "$INVALID_SECURITY_SUITE" config || true)
-  if grep -RIq "$INVALID_SECURITY_SUITE" config; then
-    echo "Gecersiz Debian security suite kaldi: $INVALID_SECURITY_SUITE" >&2
-    exit 1
-  fi
   rm -rf "$SOURCE_MIRROR"
   mkdir -p "$SOURCE_MIRROR"
   rsync -a --delete \
@@ -80,8 +71,8 @@ test -L "$CHROOT_DIR/etc/systemd/system/multi-user.target.wants/cigertool.servic
 test "$(readlink "$CHROOT_DIR/etc/systemd/system/multi-user.target.wants/cigertool.service")" = "/etc/systemd/system/cigertool.service"
 test -L "$CHROOT_DIR/etc/systemd/system/getty@tty1.service"
 test "$(readlink "$CHROOT_DIR/etc/systemd/system/getty@tty1.service")" = "/dev/null"
-if grep -R "$INVALID_SECURITY_SUITE" "$CHROOT_DIR/etc/apt" >/dev/null 2>&1; then
-  echo "Chroot icinde gecersiz suite bulundu: $INVALID_SECURITY_SUITE" >&2
+if grep -R "bookworm/updates" "$CHROOT_DIR" >/dev/null 2>&1; then
+  echo "Chroot icinde gecersiz suite bulundu: bookworm/updates" >&2
   exit 1
 fi
 grep -R "^deb http://security.debian.org/debian-security bookworm-security main$" "$CHROOT_DIR/etc/apt" >/dev/null
