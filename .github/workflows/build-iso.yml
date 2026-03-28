@@ -38,7 +38,10 @@ jobs:
       - name: Install MSYS2 packages
         shell: msys2 {0}
         run: |
+          echo "ENV: $MSYSTEM"
           pacman -Ss xorriso || true
+          pacman -Ss mtools || true
+          pacman --noconfirm -Syu
           pacman --noconfirm -S --needed \
             xorriso \
             mtools \
