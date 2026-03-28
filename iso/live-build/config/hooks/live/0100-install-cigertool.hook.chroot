@@ -1,9 +1,0 @@
-#!/bin/sh
-set -e
-
-python3 -m pip install --break-system-packages --no-cache-dir -r /opt/cigertool/requirements.txt
-python3 -m pip install --break-system-packages --no-cache-dir /opt/cigertool
-chmod +x /usr/local/bin/cigertool-launch
-mkdir -p /etc/systemd/system/multi-user.target.wants
-ln -sf /etc/systemd/system/cigertool.service /etc/systemd/system/multi-user.target.wants/cigertool.service
-ln -sf /dev/null /etc/systemd/system/getty@tty1.service
