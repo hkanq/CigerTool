@@ -143,6 +143,97 @@ function Resolve-AdkRoot {
     throw "Windows ADK bulunamadi. build\\scripts\\install_adk.ps1 ile kurulum yapin veya CIGERTOOL_ADK_ROOT tanimlayin."
 }
 
+function Resolve-WinPeArchitecture {
+    param(
+        [Parameter(Mandatory = $true)][string]$AdkRoot
+    )
+
+    $winPeRoots = @(
+        (Join-Path $AdkRoot "Windows Preinstallation Environment")
+    ) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Container) }
+
+    if (-not $winPeRoots -or $winPeRoots.Count -eq 0) {
+        throw "Windows ADK bulundu ancak 'Windows Preinstallation Environment' klasoru bulunamadi. WinPE add-on kurulumu eksik olabilir."
+    }
+
+    $preferredArchitectures = @("amd64", "x86", "arm64")
+    $rank = @{
+        "amd64" = 0
+        "x86"   = 1
+        "arm64" = 2
+    }
+    $discoveredDirectories = New-Object System.Collections.Generic.List[string]
+    $usableArchitectures = New-Object System.Collections.Generic.List[object]
+
+    foreach ($winPeRoot in $winPeRoots) {
+        Write-BuildLog ("WinPE root: {0}" -f $winPeRoot)
+        $childDirectories = @(Get-ChildItem -LiteralPath $winPeRoot -Directory -ErrorAction SilentlyContinue)
+        $childNames = @($childDirectories | Select-Object -ExpandProperty Name)
+        if ($childNames.Count -gt 0) {
+            Write-BuildLog ("WinPE mimari klasorleri: {0}" -f ($childNames -join ", "))
+            foreach ($childName in $childNames) {
+                $discoveredDirectories.Add($childName)
+            }
+        }
+        else {
+            Write-BuildLog "WinPE root altinda hic mimari klasoru bulunamadi." "WARN"
+        }
+
+        foreach ($architecture in $preferredArchitectures) {
+            $architectureRoot = Join-Path $winPeRoot $architecture
+            if (-not (Test-Path -LiteralPath $architectureRoot -PathType Container)) {
+                continue
+            }
+
+            $ocRoot = Join-Path $architectureRoot "WinPE_OCs"
+            $proofCandidates = @(
+                $ocRoot,
+                (Join-Path $architectureRoot "Media"),
+                (Join-Path $architectureRoot "en-us")
+            )
+            $proofPath = $proofCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+            if (-not $proofPath) {
+                Write-BuildLog ("WinPE mimari klasoru bulundu ama kullanilabilir payload kaniti yok: {0}" -f $architectureRoot) "WARN"
+                continue
+            }
+
+            if (-not (Test-Path -LiteralPath $ocRoot -PathType Container)) {
+                Write-BuildLog ("WinPE mimari klasoru bulundu ama WinPE_OCs eksik: {0}" -f $architectureRoot) "WARN"
+                continue
+            }
+
+            $usableArchitectures.Add([pscustomobject]@{
+                Name             = $architecture
+                WinPeRoot        = $winPeRoot
+                ArchitectureRoot = $architectureRoot
+                OcRoot           = $ocRoot
+                ProofPath        = $proofPath
+                Rank             = $rank[$architecture]
+            })
+        }
+    }
+
+    if ($usableArchitectures.Count -eq 0) {
+        $searchedRoots = $winPeRoots -join ", "
+        $foundDirectories = if ($discoveredDirectories.Count -gt 0) {
+            ($discoveredDirectories | Select-Object -Unique) -join ", "
+        }
+        else {
+            "(hicbiri)"
+        }
+        throw ("WinPE add-on kurulu olabilir ancak kullanilabilir mimari payload bulunamadi. Aranan kokler: {0}. Bulunan mimari klasorleri: {1}" -f $searchedRoots, $foundDirectories)
+    }
+
+    $selected = $usableArchitectures |
+        Sort-Object -Property Rank, Name |
+        Select-Object -First 1
+
+    Write-BuildLog ("Secilen WinPE mimarisi: {0}" -f $selected.Name)
+    Write-BuildLog ("Secilen WinPE mimari kok dizini: {0}" -f $selected.ArchitectureRoot)
+    Write-BuildLog ("Secimi dogrulayan dizin: {0}" -f $selected.ProofPath)
+    return $selected
+}
+
 function Find-ToolPath {
     param(
         [string]$Root,
@@ -425,7 +516,9 @@ Set-Content -Path $script:LogFile -Value ""
 
 $adkRoot = Resolve-AdkRoot
 $copype = Find-ToolPath -Root $adkRoot -Name "copype.cmd"
-$ocRoot = Join-Path $adkRoot "Windows Preinstallation Environment\amd64\WinPE_OCs"
+$winPeLayout = Resolve-WinPeArchitecture -AdkRoot $adkRoot
+$winPeArchitecture = $winPeLayout.Name
+$ocRoot = $winPeLayout.OcRoot
 Assert-Path -PathValue $ocRoot -Description "WinPE optional component klasoru"
 
 Write-BuildLog "CIGERTOOL_MSYS_BASH env: $($env:CIGERTOOL_MSYS_BASH)"
@@ -461,6 +554,9 @@ $mounted = $false
 $commitChanges = $false
 
 Write-BuildLog "ADK: $adkRoot"
+Write-BuildLog ("WinPE root: {0}" -f $winPeLayout.WinPeRoot)
+Write-BuildLog ("WinPE mimarisi: {0}" -f $winPeArchitecture)
+Write-BuildLog ("WinPE mimari kanit dizini: {0}" -f $winPeLayout.ProofPath)
 Write-BuildLog "Uygulama klasoru: $appRoot"
 Write-BuildLog "Cikti ISO: $isoPath"
 Write-BuildLog "MSYS bash: $bashPath"
@@ -484,9 +580,10 @@ Write-BuildLog ("copype.cmd yolu: {0}" -f $copype)
 Write-BuildLog ("copype.cmd mevcut mu: {0}" -f (Test-Path -LiteralPath $copype -PathType Leaf))
 Write-BuildLog ("WinPE work root: {0}" -f $workRoot)
 Write-BuildLog ("WinPE work root mevcut mu (oncesi): {0}" -f (Test-Path -LiteralPath $workRoot))
+Write-BuildLog ("copype icin secilen mimari: {0}" -f $winPeArchitecture)
 New-Item -ItemType Directory -Force -Path (Split-Path $workRoot -Parent) | Out-Null
 
-Invoke-CmdBatchFile -BatchPath $copype -Arguments @("amd64", $workRoot) -WorkingDirectory (Split-Path $workRoot -Parent)
+Invoke-CmdBatchFile -BatchPath $copype -Arguments @($winPeArchitecture, $workRoot) -WorkingDirectory (Split-Path $workRoot -Parent)
 
 Write-BuildLog ("WinPE work root mevcut mu (sonrasi): {0}" -f (Test-Path -LiteralPath $workRoot))
 Assert-Path -PathValue $workRoot -Description "WinPE work root"
