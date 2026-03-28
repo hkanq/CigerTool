@@ -47,6 +47,77 @@ function Invoke-Native {
     }
 }
 
+function Invoke-CmdBatchFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$BatchPath,
+        [string[]]$Arguments = @(),
+        [string]$WorkingDirectory
+    )
+
+    Write-BuildLog ("Batch arac yolu: {0}" -f $BatchPath)
+    $batchExists = Test-Path -LiteralPath $BatchPath -PathType Leaf
+    Write-BuildLog ("Batch arac mevcut mu: {0}" -f $batchExists)
+    if (-not $batchExists) {
+        throw "Batch araci bulunamadi: $BatchPath"
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($WorkingDirectory)) {
+        Write-BuildLog ("Batch calisma klasoru: {0}" -f $WorkingDirectory)
+        New-Item -ItemType Directory -Force -Path $WorkingDirectory | Out-Null
+    }
+
+    $quotedArgs = foreach ($arg in $Arguments) {
+        if ($null -eq $arg) {
+            '""'
+        }
+        elseif ($arg.IndexOfAny([char[]]@(' ', '"', '&', '(', ')')) -ge 0) {
+            '"' + $arg.Replace('"', '""') + '"'
+        }
+        else {
+            $arg
+        }
+    }
+
+    $commandText = '"' + $BatchPath.Replace('"', '""') + '"'
+    if ($quotedArgs.Count -gt 0) {
+        $commandText += " " + ($quotedArgs -join " ")
+    }
+
+    $cmdArgument = '"' + $commandText + '"'
+    Write-BuildLog ("cmd.exe /d /s /c {0}" -f $cmdArgument)
+
+    $stdoutFile = Join-Path $env:TEMP ("cigertool-batch-{0}.stdout.log" -f ([guid]::NewGuid().ToString("N")))
+    $stderrFile = Join-Path $env:TEMP ("cigertool-batch-{0}.stderr.log" -f ([guid]::NewGuid().ToString("N")))
+
+    try {
+        $process = Start-Process -FilePath "cmd.exe" `
+            -ArgumentList @("/d", "/s", "/c", $cmdArgument) `
+            -WorkingDirectory $WorkingDirectory `
+            -Wait `
+            -PassThru `
+            -NoNewWindow `
+            -RedirectStandardOutput $stdoutFile `
+            -RedirectStandardError $stderrFile
+
+        foreach ($capturedFile in @($stdoutFile, $stderrFile)) {
+            if (Test-Path -LiteralPath $capturedFile) {
+                Get-Content -LiteralPath $capturedFile | ForEach-Object {
+                    if (-not [string]::IsNullOrWhiteSpace($_)) {
+                        Write-BuildLog $_
+                    }
+                }
+            }
+        }
+
+        if ($process.ExitCode -ne 0) {
+            throw ("Batch komutu basarisiz oldu ({0}): {1}" -f $process.ExitCode, $BatchPath)
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $stdoutFile, $stderrFile -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Assert-Path {
     param(
         [Parameter(Mandatory = $true)][string]$PathValue,
@@ -409,7 +480,18 @@ if (Test-Path $workRoot) {
     Remove-Item -Recurse -Force $workRoot
 }
 
-Invoke-Native -FilePath "cmd.exe" -Arguments @("/c", "`"$copype`" amd64 `"$workRoot`"")
+Write-BuildLog ("copype.cmd yolu: {0}" -f $copype)
+Write-BuildLog ("copype.cmd mevcut mu: {0}" -f (Test-Path -LiteralPath $copype -PathType Leaf))
+Write-BuildLog ("WinPE work root: {0}" -f $workRoot)
+Write-BuildLog ("WinPE work root mevcut mu (oncesi): {0}" -f (Test-Path -LiteralPath $workRoot))
+New-Item -ItemType Directory -Force -Path (Split-Path $workRoot -Parent) | Out-Null
+
+Invoke-CmdBatchFile -BatchPath $copype -Arguments @("amd64", $workRoot) -WorkingDirectory (Split-Path $workRoot -Parent)
+
+Write-BuildLog ("WinPE work root mevcut mu (sonrasi): {0}" -f (Test-Path -LiteralPath $workRoot))
+Assert-Path -PathValue $workRoot -Description "WinPE work root"
+Assert-Path -PathValue $mediaRoot -Description "copype media klasoru"
+Assert-Path -PathValue (Join-Path $workRoot "fwfiles") -Description "copype fwfiles klasoru"
 
 $bootWim = Join-Path $mediaRoot "sources\boot.wim"
 Assert-Path -PathValue $bootWim -Description "boot.wim"
