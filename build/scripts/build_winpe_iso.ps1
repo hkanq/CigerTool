@@ -301,6 +301,7 @@ $copype = Find-ToolPath -Root $adkRoot -Name "copype.cmd"
 $ocRoot = Join-Path $adkRoot "Windows Preinstallation Environment\amd64\WinPE_OCs"
 Assert-Path -PathValue $ocRoot -Description "WinPE optional component klasoru"
 
+Write-BuildLog "CIGERTOOL_MSYS_BASH env: $($env:CIGERTOOL_MSYS_BASH)"
 $bashPath = Resolve-MsysBash
 
 $appRoot = (Resolve-Path (Join-Path $projectRoot $AppBuildRoot)).Path

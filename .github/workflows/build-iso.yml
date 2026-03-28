@@ -35,6 +35,24 @@ jobs:
           msystem: MSYS
           update: true
 
+      - name: Resolve MSYS bash path
+        id: resolve-msys-bash
+        shell: msys2 {0}
+        run: |
+          export PATH=/usr/bin:/mingw64/bin:$PATH
+          BASH_PATH="$(command -v bash)"
+          if [ -z "$BASH_PATH" ]; then
+            echo "bash bulunamadi" >&2
+            exit 1
+          fi
+          BASH_WIN_PATH="$(cygpath -w "$BASH_PATH")"
+          ENV_FILE="$(cygpath -u "$GITHUB_ENV")"
+          OUTPUT_FILE="$(cygpath -u "$GITHUB_OUTPUT")"
+          echo "Resolved bash path: $BASH_PATH"
+          echo "Resolved Windows bash path: $BASH_WIN_PATH"
+          printf 'CIGERTOOL_MSYS_BASH=%s\n' "$BASH_WIN_PATH" >> "$ENV_FILE"
+          printf 'bash_path=%s\n' "$BASH_WIN_PATH" >> "$OUTPUT_FILE"
+
       - name: Discover MSYS2 packages
         shell: msys2 {0}
         run: |
@@ -91,17 +109,6 @@ jobs:
           xorriso --version || true
           mcopy -V || true
 
-      - name: Export MSYS bash path
-        shell: msys2 {0}
-        run: |
-          export PATH=/usr/bin:/mingw64/bin:$PATH
-          BASH_PATH="$(command -v bash)"
-          BASH_WIN_PATH="$(cygpath -w "$BASH_PATH")"
-          ENV_FILE="$(cygpath -u "$GITHUB_ENV")"
-          echo "Resolved bash path: $BASH_PATH"
-          echo "Resolved Windows bash path: $BASH_WIN_PATH"
-          printf 'CIGERTOOL_MSYS_BASH=%s\n' "$BASH_WIN_PATH" >> "$ENV_FILE"
-
       - name: Install Python dependencies
         shell: powershell
         run: |
@@ -125,6 +132,8 @@ jobs:
 
       - name: Debug exported MSYS bash
         shell: powershell
+        env:
+          CIGERTOOL_MSYS_BASH: ${{ steps.resolve-msys-bash.outputs.bash_path }}
         run: |
           Write-Host "CIGERTOOL_MSYS_BASH=$env:CIGERTOOL_MSYS_BASH"
           if (-not $env:CIGERTOOL_MSYS_BASH) {
@@ -137,6 +146,8 @@ jobs:
 
       - name: Build WinPE ISO
         shell: powershell
+        env:
+          CIGERTOOL_MSYS_BASH: ${{ steps.resolve-msys-bash.outputs.bash_path }}
         run: |
           .\build\scripts\build_winpe_iso.ps1 -OutputIso "artifacts\CigerTool-by-hkannq.iso" -RequirePrebootMenu
 
