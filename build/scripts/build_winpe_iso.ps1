@@ -128,6 +128,28 @@ function Assert-Path {
     }
 }
 
+function Copy-DirectoryContents {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourcePath,
+        [Parameter(Mandatory = $true)][string]$DestinationPath,
+        [Parameter(Mandatory = $true)][string]$Description
+    )
+
+    Assert-Path -PathValue $SourcePath -Description $Description
+    New-Item -ItemType Directory -Force -Path $DestinationPath | Out-Null
+    $items = @(Get-ChildItem -LiteralPath $SourcePath -Force -ErrorAction Stop)
+    foreach ($item in $items) {
+        Copy-Item -LiteralPath $item.FullName -Destination $DestinationPath -Recurse -Force
+    }
+    Write-BuildLog (
+        "{0} kopyalandi: {1} -> {2} ({3} oge)" -f
+        $Description,
+        $SourcePath,
+        $DestinationPath,
+        $items.Count
+    )
+}
+
 function Resolve-AdkRoot {
     $candidates = @(
         $env:CIGERTOOL_ADK_ROOT,
@@ -305,6 +327,76 @@ function Resolve-CopypeArchitectureTokens {
     Write-BuildLog ("copype dosya sistemi mimarisi: {0}" -f $FilesystemArchitecture)
     Write-BuildLog ("copype komut token adaylari: {0}" -f ($tokenCandidates -join ", "))
     return @($tokenCandidates.ToArray())
+}
+
+function Stage-WinPeWorkspaceManually {
+    param(
+        [Parameter(Mandatory = $true)][string]$ArchitectureRoot,
+        [Parameter(Mandatory = $true)][string]$SourceMediaRoot,
+        [Parameter(Mandatory = $true)][string]$WorkRoot
+    )
+
+    $destinationMediaRoot = Join-Path $WorkRoot "media"
+    $destinationFwfilesRoot = Join-Path $WorkRoot "fwfiles"
+    $destinationMountRoot = Join-Path $WorkRoot "mount"
+
+    Write-BuildLog "copype tum denemelerde basarisiz oldu. Manual WinPE staging baslatiliyor." "WARN"
+    Write-BuildLog ("Manual staging kaynak mimari koku: {0}" -f $ArchitectureRoot)
+    Write-BuildLog ("Manual staging kaynak Media: {0}" -f $SourceMediaRoot)
+    Write-BuildLog ("Manual staging hedef work root: {0}" -f $WorkRoot)
+
+    if (Test-Path -LiteralPath $WorkRoot) {
+        Write-BuildLog "Manual staging oncesi mevcut work root temizleniyor."
+        Remove-Item -LiteralPath $WorkRoot -Recurse -Force
+    }
+
+    New-Item -ItemType Directory -Force -Path $WorkRoot | Out-Null
+    New-Item -ItemType Directory -Force -Path $destinationFwfilesRoot | Out-Null
+    New-Item -ItemType Directory -Force -Path $destinationMountRoot | Out-Null
+
+    Copy-DirectoryContents -SourcePath $SourceMediaRoot -DestinationPath $destinationMediaRoot -Description "WinPE Media payload"
+
+    $fwSource = Join-Path $ArchitectureRoot "fwfiles"
+    if (Test-Path -LiteralPath $fwSource -PathType Container) {
+        Copy-DirectoryContents -SourcePath $fwSource -DestinationPath $destinationFwfilesRoot -Description "WinPE fwfiles payload"
+    }
+    else {
+        Write-BuildLog "Kaynakta ayri bir fwfiles klasoru yok; media icindeki boot dosyalariyla fwfiles iskeleti olusturuluyor." "WARN"
+        foreach ($seed in @(
+            @{ Source = (Join-Path $destinationMediaRoot "boot"); Destination = (Join-Path $destinationFwfilesRoot "boot"); Label = "fwfiles boot tohumu" },
+            @{ Source = (Join-Path $destinationMediaRoot "EFI"); Destination = (Join-Path $destinationFwfilesRoot "EFI"); Label = "fwfiles EFI tohumu" }
+        )) {
+            if (Test-Path -LiteralPath $seed.Source -PathType Container) {
+                Copy-DirectoryContents -SourcePath $seed.Source -DestinationPath $seed.Destination -Description $seed.Label
+            }
+        }
+    }
+
+    $requiredAfterStaging = @(
+        (Join-Path $destinationMediaRoot "sources\boot.wim"),
+        (Join-Path $destinationMediaRoot "boot\bcd"),
+        (Join-Path $destinationMediaRoot "boot\etfsboot.com"),
+        (Join-Path $destinationMediaRoot "EFI\Boot\bootx64.efi"),
+        (Join-Path $destinationMediaRoot "EFI\Microsoft\Boot\BCD"),
+        $destinationFwfilesRoot,
+        $destinationMountRoot
+    )
+
+    $missingAfterStaging = @($requiredAfterStaging | Where-Object { -not (Test-Path -LiteralPath $_) })
+    if ($missingAfterStaging.Count -gt 0) {
+        throw (
+            "Manual WinPE staging basarisiz. Mimari kok={0}; kaynak Media={1}; eksik ogeler={2}" -f
+            $ArchitectureRoot,
+            $SourceMediaRoot,
+            ($missingAfterStaging -join ", ")
+        )
+    }
+
+    Write-BuildLog ("Manual staging dogrulandi: {0}" -f (Join-Path $destinationMediaRoot "sources\boot.wim"))
+    Write-BuildLog ("Manual staging dogrulandi: {0}" -f (Join-Path $destinationMediaRoot "boot\bcd"))
+    Write-BuildLog ("Manual staging dogrulandi: {0}" -f (Join-Path $destinationMediaRoot "boot\etfsboot.com"))
+    Write-BuildLog ("Manual staging dogrulandi: {0}" -f (Join-Path $destinationMediaRoot "EFI\Boot\bootx64.efi"))
+    Write-BuildLog ("Manual staging dogrulandi: {0}" -f (Join-Path $destinationMediaRoot "EFI\Microsoft\Boot\BCD"))
 }
 
 function Find-ToolPath {
@@ -662,6 +754,7 @@ New-Item -ItemType Directory -Force -Path $copypeWorkRootParent | Out-Null
 $copypeSucceeded = $false
 $copypeLastError = $null
 $copypeSuccessfulToken = $null
+$manualStagingUsed = $false
 for ($tokenIndex = 0; $tokenIndex -lt $copypeTokenCandidates.Count; $tokenIndex++) {
     $copypeToken = [string]$copypeTokenCandidates[$tokenIndex]
     if (Test-Path -LiteralPath $workRoot) {
@@ -692,15 +785,22 @@ for ($tokenIndex = 0; $tokenIndex -lt $copypeTokenCandidates.Count; $tokenIndex+
 }
 
 if (-not $copypeSucceeded) {
-    throw (
-        "copype basarisiz. Mimari klasoru={0}; denenen tokenler={1}; son hata={2}" -f
+    Write-BuildLog (
+        "copype basarisiz. Manual staging fallback devreye giriyor. Mimari klasoru={0}; denenen tokenler={1}; son hata={2}" -f
         $winPeArchitecture,
         ($copypeTokenCandidates -join ", "),
         $copypeLastError.Exception.Message
-    )
+    ) "WARN"
+    Stage-WinPeWorkspaceManually -ArchitectureRoot $winPeLayout.ArchitectureRoot -SourceMediaRoot $winPeLayout.MediaRoot -WorkRoot $workRoot
+    $manualStagingUsed = $true
+}
+elseif ($copypeSucceeded) {
+    Write-BuildLog ("copype basarili | mimari klasoru={0} | komut tokeni={1}" -f $winPeArchitecture, $copypeSuccessfulToken)
 }
 
-Write-BuildLog ("copype basarili | mimari klasoru={0} | komut tokeni={1}" -f $winPeArchitecture, $copypeSuccessfulToken)
+if ($manualStagingUsed) {
+    Write-BuildLog ("WinPE workspace manual staging ile hazirlandi | mimari klasoru={0} | kaynak Media={1}" -f $winPeLayout.ArchitectureRoot, $winPeLayout.MediaRoot)
+}
 
 Write-BuildLog ("WinPE work root mevcut mu (sonrasi): {0}" -f (Test-Path -LiteralPath $workRoot))
 Assert-Path -PathValue $workRoot -Description "WinPE work root"
