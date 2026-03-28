@@ -16,7 +16,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 150
     env:
-      MSYSTEM: MINGW64
+      MSYSTEM: MSYS
       CHERE_INVOKING: 1
       MSYS2_PATH_TYPE: inherit
 
@@ -32,20 +32,21 @@ jobs:
       - name: Setup MSYS2 (GRUB toolchain)
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: MSYS
           update: true
 
-      - name: Install MSYS2 MINGW64 packages
+      - name: Install MSYS2 packages
         shell: msys2 {0}
         run: |
+          pacman -Ss xorriso || true
           pacman --noconfirm -S --needed \
-            mingw-w64-x86_64-xorriso \
-            mingw-w64-x86_64-mtools
+            xorriso \
+            mtools \
+            dosfstools
 
       - name: Expose MSYS2 toolchain on PATH
         shell: powershell
         run: |
-          "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           "C:\msys64\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Log environment
@@ -56,28 +57,32 @@ jobs:
           dism /English /Get-CurrentEdition
           Write-Host "MSYSTEM=$env:MSYSTEM"
 
-      - name: Debug MSYS2 MINGW64 toolchain
+      - name: Debug MSYS2 toolchain
         shell: msys2 {0}
         run: |
           echo "MSYSTEM=$MSYSTEM"
           which xorriso || true
           xorriso --version || true
           which mformat || true
+          which mkfs.fat || true
 
       - name: Verify ISO toolchain
         shell: powershell
         run: |
-          if (-not (Test-Path "C:\msys64\mingw64\bin\xorriso.exe")) {
+          if (-not (Test-Path "C:\msys64\usr\bin\xorriso.exe")) {
             throw "xorriso.exe bulunamadi."
           }
-          if (-not (Test-Path "C:\msys64\mingw64\bin\mformat.exe")) {
+          if (-not (Test-Path "C:\msys64\usr\bin\mformat.exe")) {
             throw "mformat.exe bulunamadi."
           }
-          if (-not (Test-Path "C:\msys64\mingw64\bin\mcopy.exe")) {
+          if (-not (Test-Path "C:\msys64\usr\bin\mcopy.exe")) {
             throw "mcopy.exe bulunamadi."
           }
-          if (-not (Test-Path "C:\msys64\mingw64\bin\mmd.exe")) {
+          if (-not (Test-Path "C:\msys64\usr\bin\mmd.exe")) {
             throw "mmd.exe bulunamadi."
+          }
+          if (-not (Test-Path "C:\msys64\usr\bin\mkfs.fat.exe")) {
+            throw "mkfs.fat.exe bulunamadi."
           }
 
       - name: Install Python dependencies
