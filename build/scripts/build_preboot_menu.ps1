@@ -112,7 +112,7 @@ New-Item -ItemType Directory -Force -Path $efiTargetDir | Out-Null
 
 $bashPath = Resolve-GrubBash
 if (-not $bashPath) {
-    $message = "GRUB toolchain bulunamadi. MSYS2 + grub kurulu olmali veya CIGERTOOL_GRUB_BASH tanimlanmali."
+    $message = "GRUB toolchain bulunamadi. MSYS2 MINGW64 GRUB paketi kurulu olmali veya CIGERTOOL_GRUB_BASH tanimlanmali."
     if ($RequireMenu) {
         throw $message
     }
@@ -149,7 +149,7 @@ if (Test-Path $tempEfi) {
 
 $msysCfg = Convert-ToMsysPath $efiCfgTarget
 $msysOut = Convert-ToMsysPath $tempEfi
-$grubCommand = "grub-mkstandalone -O x86_64-efi -o '$msysOut' ""boot/grub/grub.cfg=$msysCfg"""
+$grubCommand = "export MSYSTEM=MINGW64; export PATH=/mingw64/bin:/usr/bin:`$PATH; grub-mkstandalone -O x86_64-efi -o '$msysOut' ""boot/grub/grub.cfg=$msysCfg"""
 Write-BuildLog "GRUB EFI binary olusturuluyor."
 & $bashPath -lc $grubCommand
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $tempEfi)) {

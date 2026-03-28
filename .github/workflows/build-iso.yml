@@ -15,6 +15,11 @@ jobs:
   build-winpe-iso:
     runs-on: windows-latest
     timeout-minutes: 150
+    env:
+      MSYSTEM: MINGW64
+      CHERE_INVOKING: 1
+      MSYS2_PATH_TYPE: inherit
+      CIGERTOOL_GRUB_BASH: C:\msys64\usr\bin\bash.exe
 
     steps:
       - name: Checkout
@@ -28,10 +33,19 @@ jobs:
       - name: Setup MSYS2 (GRUB toolchain)
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MSYS
+          msystem: MINGW64
           update: true
           install: >-
-            grub
+            mingw-w64-x86_64-grub
+            mingw-w64-x86_64-xorriso
+            mingw-w64-x86_64-mtools
+            mingw-w64-x86_64-dosfstools
+
+      - name: Expose MSYS2 toolchain on PATH
+        shell: powershell
+        run: |
+          "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "C:\msys64\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Log environment
         shell: powershell
@@ -39,9 +53,21 @@ jobs:
           $PSVersionTable
           python --version
           dism /English /Get-CurrentEdition
-          if (Test-Path "C:\msys64\usr\bin\bash.exe") {
-            C:\msys64\usr\bin\bash.exe -lc "grub-mkstandalone --version"
-          }
+          Write-Host "MSYSTEM=$env:MSYSTEM"
+          Write-Host "CIGERTOOL_GRUB_BASH=$env:CIGERTOOL_GRUB_BASH"
+
+      - name: Verify MSYS2 MINGW64 toolchain
+        shell: msys2 {0}
+        run: |
+          echo "MSYSTEM=$MSYSTEM"
+          echo "PATH=$PATH"
+          which grub-mkimage
+          which grub-mkstandalone
+          grub-mkimage --version
+          grub-mkstandalone --version
+          which xorriso
+          xorriso --version
+          which mformat
 
       - name: Verify GRUB toolchain
         shell: powershell
@@ -49,7 +75,19 @@ jobs:
           if (-not (Test-Path "C:\msys64\usr\bin\bash.exe")) {
             throw "MSYS2 bash bulunamadi."
           }
-          C:\msys64\usr\bin\bash.exe -lc "command -v grub-mkstandalone"
+          if (-not (Test-Path "C:\msys64\mingw64\bin\grub-mkstandalone.exe")) {
+            throw "grub-mkstandalone.exe bulunamadi."
+          }
+          if (-not (Test-Path "C:\msys64\mingw64\bin\grub-mkimage.exe")) {
+            throw "grub-mkimage.exe bulunamadi."
+          }
+          if (-not (Test-Path "C:\msys64\mingw64\bin\xorriso.exe")) {
+            throw "xorriso.exe bulunamadi."
+          }
+          if (-not (Test-Path "C:\msys64\mingw64\bin\mformat.exe")) {
+            throw "mformat.exe bulunamadi."
+          }
+          C:\msys64\usr\bin\bash.exe -lc "export MSYSTEM=MINGW64; export PATH=/mingw64/bin:/usr/bin:`$PATH; command -v grub-mkstandalone && command -v grub-mkimage && command -v xorriso && command -v mformat"
 
       - name: Install Python dependencies
         shell: powershell
