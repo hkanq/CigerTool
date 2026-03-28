@@ -84,26 +84,47 @@ function Find-ToolPath {
     return $item.FullName
 }
 
-function Resolve-MsysTool {
-    param([Parameter(Mandatory = $true)][string]$Name)
-
-    $command = Get-Command $Name -ErrorAction SilentlyContinue
-    if ($command -and $command.Source) {
-        return $command.Source
-    }
-
+function Resolve-MsysBash {
     $candidates = @(
-        (Join-Path "C:\msys64\usr\bin" $Name),
-        (Join-Path "C:\tools\msys64\usr\bin" $Name),
-        (Join-Path "C:\msys64\mingw64\bin" $Name),
-        (Join-Path "C:\tools\msys64\mingw64\bin" $Name)
-    )
+        $env:CIGERTOOL_MSYS_BASH,
+        "C:\msys64\usr\bin\bash.exe",
+        "C:\tools\msys64\usr\bin\bash.exe"
+    ) | Where-Object { $_ }
+
     foreach ($candidate in $candidates) {
         if (Test-Path $candidate) {
             return $candidate
         }
     }
-    throw "$Name bulunamadi. MSYS2 MINGW64 xorriso/mtools toolchain gerekli."
+    throw "MSYS2 bash bulunamadi. xorriso ve mtools bash -lc ile calistirilir."
+}
+
+function Convert-ToMsysPath {
+    param([string]$PathValue)
+    $resolved = [System.IO.Path]::GetFullPath($PathValue).Replace("\", "/")
+    if ($resolved.Length -lt 3 -or $resolved[1] -ne ":") {
+        return $resolved
+    }
+    return "/" + $resolved[0].ToString().ToLowerInvariant() + $resolved.Substring(2)
+}
+
+function Convert-ToBashSingleQuoted {
+    param([string]$Value)
+    return "'" + $Value.Replace("'", "'\"'\"'") + "'"
+}
+
+function Invoke-MsysCommand {
+    param(
+        [Parameter(Mandatory = $true)][string]$BashPath,
+        [Parameter(Mandatory = $true)][string]$ScriptText,
+        [Parameter(Mandatory = $true)][string]$Description
+    )
+
+    Write-BuildLog ("MSYS komut: {0}" -f $Description)
+    & $BashPath -lc $ScriptText 2>&1 | Tee-Object -FilePath $script:LogFile -Append | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw ("MSYS komut basarisiz oldu ({0}): {1}" -f $LASTEXITCODE, $Description)
+    }
 }
 
 function Add-OptionalComponent {
@@ -150,11 +171,9 @@ function Validate-MediaLayout {
 
 function New-EfiBootImage {
     param(
+        [string]$BashPath,
         [string]$MediaRoot,
-        [string]$ImagePath,
-        [string]$MformatPath,
-        [string]$MmdPath,
-        [string]$McopyPath
+        [string]$ImagePath
     )
 
     $efiRoot = Join-Path $MediaRoot "EFI"
@@ -177,43 +196,62 @@ function New-EfiBootImage {
         $stream.Dispose()
     }
 
-    Invoke-Native -FilePath $MformatPath -Arguments @("-i", $ImagePath, "-F", "-v", "CIGERTOOL_EFI", "::")
-    Invoke-Native -FilePath $MmdPath -Arguments @("-i", $ImagePath, "::/EFI")
-    Invoke-Native -FilePath $McopyPath -Arguments @("-i", $ImagePath, "-s", (Join-Path $efiRoot "*"), "::/EFI")
+    $msysImagePath = Convert-ToMsysPath $ImagePath
+    $msysEfiRoot = Convert-ToMsysPath $efiRoot
+    $quotedImage = Convert-ToBashSingleQuoted $msysImagePath
+    $quotedEfiRoot = Convert-ToBashSingleQuoted $msysEfiRoot
+    $toolchainPrefix = 'export MSYSTEM=MSYS; export PATH=/usr/bin:/mingw64/bin:$PATH; '
+
+    Invoke-MsysCommand -BashPath $BashPath -Description "mformat -i $msysImagePath -F -v CIGERTOOL_EFI ::" -ScriptText (
+        $toolchainPrefix + "echo `"MSYSTEM=`$MSYSTEM`"; echo `"PATH=`$PATH`"; which mformat; mformat -i $quotedImage -F -v CIGERTOOL_EFI ::"
+    )
+    Invoke-MsysCommand -BashPath $BashPath -Description "mmd -i $msysImagePath ::/EFI" -ScriptText (
+        $toolchainPrefix + "which mmd; mmd -i $quotedImage ::/EFI"
+    )
+    Invoke-MsysCommand -BashPath $BashPath -Description "mcopy -i $msysImagePath -s $msysEfiRoot ::" -ScriptText (
+        $toolchainPrefix + "which mcopy; mcopy -i $quotedImage -s $quotedEfiRoot ::"
+    )
     Write-BuildLog "UEFI boot image olusturuldu: $ImagePath"
 }
 
 function Build-IsoWithXorriso {
     param(
+        [string]$BashPath,
         [string]$MediaRoot,
         [string]$IsoPath,
-        [string]$EfiImageRelativePath,
-        [string]$XorrisoPath
+        [string]$EfiImageRelativePath
     )
 
     Assert-Path -PathValue (Join-Path $MediaRoot "boot\etfsboot.com") -Description "BIOS boot image"
     Assert-Path -PathValue (Join-Path $MediaRoot $EfiImageRelativePath.Replace("/", "\")) -Description "UEFI boot image"
 
-    $arguments = @(
-        "-as", "mkisofs",
-        "-iso-level", "3",
+    $msysMediaRoot = Convert-ToMsysPath $MediaRoot
+    $msysIsoPath = Convert-ToMsysPath $IsoPath
+    $quotedIso = Convert-ToBashSingleQuoted $msysIsoPath
+    $quotedMediaRoot = Convert-ToBashSingleQuoted $msysMediaRoot
+    $quotedEfiImage = Convert-ToBashSingleQuoted $EfiImageRelativePath
+    $toolchainPrefix = 'export MSYSTEM=MSYS; export PATH=/usr/bin:/mingw64/bin:$PATH; '
+    $command = @(
+        "which xorriso",
+        "xorriso -as mkisofs",
+        "-iso-level 3",
         "-full-iso9660-filenames",
-        "-volid", "CIGERTOOL",
-        "-eltorito-boot", "boot/etfsboot.com",
+        "-volid CIGERTOOL",
+        "-eltorito-boot boot/etfsboot.com",
         "-no-emul-boot",
-        "-boot-load-size", "8",
-        "-eltorito-catalog", "boot/boot.cat",
+        "-boot-load-size 8",
+        "-eltorito-catalog boot/boot.cat",
         "-eltorito-alt-boot",
-        "-e", $EfiImageRelativePath,
+        "-e $quotedEfiImage",
         "-no-emul-boot",
         "-isohybrid-gpt-basdat",
         "-udf",
         "-joliet-long",
         "-relaxed-filenames",
-        "-o", $IsoPath,
-        $MediaRoot
-    )
-    Invoke-Native -FilePath $XorrisoPath -Arguments $arguments
+        "-o $quotedIso",
+        $quotedMediaRoot
+    ) -join " "
+    Invoke-MsysCommand -BashPath $BashPath -Description "xorriso -as mkisofs -> $msysIsoPath" -ScriptText ($toolchainPrefix + $command)
 }
 
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
@@ -229,10 +267,7 @@ $copype = Find-ToolPath -Root $adkRoot -Name "copype.cmd"
 $ocRoot = Join-Path $adkRoot "Windows Preinstallation Environment\amd64\WinPE_OCs"
 Assert-Path -PathValue $ocRoot -Description "WinPE optional component klasoru"
 
-$xorrisoPath = Resolve-MsysTool -Name "xorriso.exe"
-$mformatPath = Resolve-MsysTool -Name "mformat.exe"
-$mmdPath = Resolve-MsysTool -Name "mmd.exe"
-$mcopyPath = Resolve-MsysTool -Name "mcopy.exe"
+$bashPath = Resolve-MsysBash
 
 $appRoot = (Resolve-Path (Join-Path $projectRoot $AppBuildRoot)).Path
 Assert-Path -PathValue $appRoot -Description "PyInstaller uygulama cikti klasoru"
@@ -256,8 +291,10 @@ $commitChanges = $false
 Write-BuildLog "ADK: $adkRoot"
 Write-BuildLog "Uygulama klasoru: $appRoot"
 Write-BuildLog "Cikti ISO: $isoPath"
-Write-BuildLog "xorriso: $xorrisoPath"
-Write-BuildLog "mtools: $mformatPath"
+Write-BuildLog "MSYS bash: $bashPath"
+Invoke-MsysCommand -BashPath $bashPath -Description "MSYS toolchain probe" -ScriptText (
+    'echo "MSYSTEM=$MSYSTEM"; export PATH=/usr/bin:/mingw64/bin:$PATH; echo "PATH=$PATH"; which xorriso; which mcopy; which mformat'
+)
 
 if (Test-Path $workRoot) {
     Write-BuildLog "Eski calisma klasoru temizleniyor."
@@ -353,8 +390,8 @@ Validate-MediaLayout -MediaRoot $mediaRoot -PrebootRequired ([bool]$RequirePrebo
 $efiImageRelativePath = "efi/cigertool/efiboot.img"
 $efiImagePath = Join-Path $mediaRoot $efiImageRelativePath.Replace("/", "\")
 New-Item -ItemType Directory -Force -Path (Split-Path $efiImagePath -Parent) | Out-Null
-New-EfiBootImage -MediaRoot $mediaRoot -ImagePath $efiImagePath -MformatPath $mformatPath -MmdPath $mmdPath -McopyPath $mcopyPath
-Build-IsoWithXorriso -MediaRoot $mediaRoot -IsoPath $isoPath -EfiImageRelativePath $efiImageRelativePath -XorrisoPath $xorrisoPath
+New-EfiBootImage -BashPath $bashPath -MediaRoot $mediaRoot -ImagePath $efiImagePath
+Build-IsoWithXorriso -BashPath $bashPath -MediaRoot $mediaRoot -IsoPath $isoPath -EfiImageRelativePath $efiImageRelativePath
 Assert-Path -PathValue $isoPath -Description "ISO dosyasi"
 
 $isoItem = Get-Item $isoPath
@@ -373,7 +410,7 @@ Set-Content -Path $hashPath -Value $hash.Hash
     built_at = (Get-Date).ToString("o")
     adk_root = $adkRoot
     preboot_menu = [bool]$prebootBuilt
-    xorriso = $xorrisoPath
+    msys_bash = $bashPath
 } | ConvertTo-Json -Depth 3 | Set-Content -Path $metadataPath
 
 Write-BuildLog "ISO dogrulandi ve hash uretildi."

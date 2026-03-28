@@ -77,6 +77,7 @@ jobs:
         run: |
           echo "MSYSTEM=$MSYSTEM"
           export PATH=/usr/bin:/mingw64/bin:$PATH
+          echo "PATH=$PATH"
           which xorriso || true
           xorriso --version || true
           which mcopy || true
@@ -85,17 +86,13 @@ jobs:
       - name: Verify ISO toolchain
         shell: powershell
         run: |
-          if (-not (Test-Path "C:\msys64\usr\bin\xorriso.exe")) {
-            throw "xorriso.exe bulunamadi."
+          $bash = "C:\msys64\usr\bin\bash.exe"
+          if (-not (Test-Path $bash)) {
+            throw "MSYS2 bash bulunamadi."
           }
-          if (-not (Test-Path "C:\msys64\mingw64\bin\mformat.exe")) {
-            throw "mformat.exe bulunamadi."
-          }
-          if (-not (Test-Path "C:\msys64\mingw64\bin\mcopy.exe")) {
-            throw "mcopy.exe bulunamadi."
-          }
-          if (-not (Test-Path "C:\msys64\mingw64\bin\mmd.exe")) {
-            throw "mmd.exe bulunamadi."
+          & $bash -lc "export PATH=/usr/bin:/mingw64/bin:`$PATH; echo MSYSTEM=`$MSYSTEM; echo PATH=`$PATH; which xorriso; which mcopy; which mformat; which mmd"
+          if ($LASTEXITCODE -ne 0) {
+            throw "MSYS ISO toolchain bash uzerinden dogrulanamadi."
           }
 
       - name: Install Python dependencies
