@@ -337,6 +337,95 @@ function Resolve-CopypeArchitectureTokens {
     return @($tokenCandidates.ToArray())
 }
 
+function Resolve-WinPeRequiredSourceFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$ArchitectureRoot,
+        [Parameter(Mandatory = $true)][string]$RelativePath
+    )
+
+    $searchRoot = $ArchitectureRoot
+    Write-BuildLog ("Kaynak arama basliyor | goreli={0} | search_root={1}" -f $RelativePath, $searchRoot)
+
+    if ($RelativePath -ieq "sources\boot.wim") {
+        Write-BuildLog "Media\\sources\\boot.wim eksik. WinPE WIM fallback aramasi baslatiliyor." "WARN"
+        $candidateFiles = @(
+            Get-ChildItem -LiteralPath $ArchitectureRoot -Recurse -Force -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -ieq "winpe.wim" -or $_.Name -ieq "boot.wim" }
+        )
+        if ($candidateFiles.Count -gt 0) {
+            Write-BuildLog ("boot.wim/winpe.wim adaylari: {0}" -f (($candidateFiles | Select-Object -ExpandProperty FullName) -join " | "))
+        }
+        else {
+            Write-BuildLog "boot.wim/winpe.wim fallback adaylari bulunamadi." "WARN"
+            return $null
+        }
+
+        return $candidateFiles |
+            Sort-Object @{
+                Expression = {
+                    if ($_.FullName -match '(?i)[\\/]en-us[\\/]winpe\.wim$') { return 0 }
+                    if ($_.FullName -match '(?i)[\\/]winpe\.wim$') { return 1 }
+                    if ($_.FullName -match '(?i)[\\/]sources[\\/]boot\.wim$') { return 2 }
+                    if ($_.FullName -match '(?i)[\\/]boot\.wim$') { return 3 }
+                    return 10
+                }
+            }, FullName |
+            Select-Object -First 1
+    }
+
+    $leafName = Split-Path $RelativePath -Leaf
+    $candidateFiles = @(
+        Get-ChildItem -LiteralPath $ArchitectureRoot -Recurse -Force -File -Filter $leafName -ErrorAction SilentlyContinue
+    )
+    if ($candidateFiles.Count -eq 0) {
+        Write-BuildLog ("Zorunlu dosya fallback adaylari bulunamadi | goreli={0} | yaprak={1}" -f $RelativePath, $leafName) "WARN"
+        return $null
+    }
+
+    return $candidateFiles |
+        Sort-Object @{
+            Expression = {
+                if ($_.FullName.EndsWith($RelativePath, [System.StringComparison]::OrdinalIgnoreCase)) { 0 } else { 1 }
+            }
+        }, FullName |
+        Select-Object -First 1
+}
+
+function Ensure-WinPeStagedFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$ArchitectureRoot,
+        [Parameter(Mandatory = $true)][string]$SourceMediaRoot,
+        [Parameter(Mandatory = $true)][string]$DestinationMediaRoot,
+        [Parameter(Mandatory = $true)][string]$RelativePath
+    )
+
+    $stagedPath = Join-Path $DestinationMediaRoot $RelativePath
+    $preferredSource = Join-Path $SourceMediaRoot $RelativePath
+    Write-BuildLog ("Manual staging dogrulamasi basliyor | staged={0} | beklenen kaynak={1}" -f $stagedPath, $preferredSource)
+
+    if (Test-Path -LiteralPath $stagedPath) {
+        Write-BuildLog ("Manual staging dogrulandi: {0}" -f $stagedPath)
+        return $stagedPath
+    }
+
+    Write-BuildLog ("Staged path eksik, fallback arama basliyor | staged={0} | search_root={1}" -f $stagedPath, $ArchitectureRoot) "WARN"
+    $selectedCandidate = Resolve-WinPeRequiredSourceFile -ArchitectureRoot $ArchitectureRoot -RelativePath $RelativePath
+    if (-not $selectedCandidate) {
+        throw ("Gerekli WinPE dosyasi bulunamadi | staged={0} | beklenen kaynak={1} | mimari kok={2}" -f $stagedPath, $preferredSource, $ArchitectureRoot)
+    }
+
+    Write-BuildLog ("Fallback kaynak bulundu | goreli={0} | kaynak={1} | hedef={2}" -f $RelativePath, $selectedCandidate.FullName, $stagedPath)
+    New-Item -ItemType Directory -Force -Path (Split-Path $stagedPath -Parent) | Out-Null
+    Copy-Item -LiteralPath $selectedCandidate.FullName -Destination $stagedPath -Force
+
+    if (-not (Test-Path -LiteralPath $stagedPath)) {
+        throw ("Manual staging dogrulama basarisiz | staged={0} | beklenen kaynak={1}" -f $stagedPath, $preferredSource)
+    }
+
+    Write-BuildLog ("Manual staging dogrulandi: {0}" -f $stagedPath)
+    return $stagedPath
+}
+
 function Stage-WinPeWorkspaceManually {
     param(
         [Parameter(Mandatory = $true)][string]$ArchitectureRoot,
@@ -408,39 +497,8 @@ function Stage-WinPeWorkspaceManually {
         $validatedPaths = New-Object System.Collections.Generic.List[string]
         foreach ($relativePath in $requiredRelativePaths) {
             $lastManualStep = "gerekli path dogrulama: $relativePath"
-            $stagedPath = Join-Path $destinationMediaRoot $relativePath
-            $preferredSource = Join-Path $SourceMediaRoot $relativePath
-            Write-BuildLog ("Manual staging dogrulamasi basliyor | staged={0} | beklenen kaynak={1}" -f $stagedPath, $preferredSource)
-
-            if (-not (Test-Path -LiteralPath $stagedPath)) {
-                Write-BuildLog ("Staged path eksik, fallback arama basliyor: {0}" -f $stagedPath) "WARN"
-                $leafName = Split-Path $relativePath -Leaf
-                $candidateFiles = @(
-                    Get-ChildItem -LiteralPath $ArchitectureRoot -Recurse -Force -File -Filter $leafName -ErrorAction SilentlyContinue
-                )
-                if ($candidateFiles.Count -gt 0) {
-                    $selectedCandidate = $candidateFiles |
-                        Sort-Object @{
-                            Expression = {
-                                if ($_.FullName.EndsWith($relativePath, [System.StringComparison]::OrdinalIgnoreCase)) { 0 } else { 1 }
-                            }
-                        }, FullName |
-                        Select-Object -First 1
-                    Write-BuildLog ("Fallback kaynak bulundu | goreli={0} | kaynak={1} | hedef={2}" -f $relativePath, $selectedCandidate.FullName, $stagedPath)
-                    New-Item -ItemType Directory -Force -Path (Split-Path $stagedPath -Parent) | Out-Null
-                    Copy-Item -LiteralPath $selectedCandidate.FullName -Destination $stagedPath -Force
-                }
-                else {
-                    throw ("Gerekli WinPE dosyasi bulunamadi | staged={0} | beklenen kaynak={1} | mimari kok={2}" -f $stagedPath, $preferredSource, $ArchitectureRoot)
-                }
-            }
-
-            if (-not (Test-Path -LiteralPath $stagedPath)) {
-                throw ("Manual staging dogrulama basarisiz | staged={0} | beklenen kaynak={1}" -f $stagedPath, $preferredSource)
-            }
-
-            Write-BuildLog ("Manual staging dogrulandi: {0}" -f $stagedPath)
-            $validatedPaths.Add($stagedPath)
+            $validatedPath = Ensure-WinPeStagedFile -ArchitectureRoot $ArchitectureRoot -SourceMediaRoot $SourceMediaRoot -DestinationMediaRoot $destinationMediaRoot -RelativePath $relativePath
+            $validatedPaths.Add($validatedPath)
         }
 
         $lastManualStep = "son ozet"
