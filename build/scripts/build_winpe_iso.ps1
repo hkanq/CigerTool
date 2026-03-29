@@ -832,10 +832,10 @@ function Assert-MsysVisiblePath {
 
     $quotedPath = Convert-ToBashSingleQuoted $MsysPath
     $probeCommand = if ($PathKind -eq "directory") {
-        "if [ -d $quotedPath ]; then ls -ld $quotedPath; else echo MISSING:$quotedPath; exit 44; fi"
+        "if [ -d $quotedPath ]; then ls -ld $quotedPath; else echo MISSING:$quotedPath; false; fi"
     }
     else {
-        "if [ -f $quotedPath ]; then ls -l $quotedPath; else echo MISSING:$quotedPath; exit 44; fi"
+        "if [ -f $quotedPath ]; then ls -l $quotedPath; else echo MISSING:$quotedPath; false; fi"
     }
     $scriptText = New-MsysScript @(
         'export MSYSTEM=MSYS'
