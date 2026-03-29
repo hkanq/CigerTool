@@ -16,6 +16,59 @@ function Write-BuildLog {
     Add-Content -Path $script:LogFile -Value $line
 }
 
+function Normalize-ExternalOutputLine {
+    param(
+        [AllowNull()][object]$Value
+    )
+
+    if ($null -eq $Value) {
+        return $null
+    }
+
+    $text = [string]$Value
+    if ([string]::IsNullOrEmpty($text)) {
+        return ""
+    }
+
+    return $text.Replace([string][char]0, "").TrimEnd("`r", "`n")
+}
+
+function Read-ExternalOutputFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        return @()
+    }
+
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -eq 0) {
+        return @()
+    }
+
+    $text = if ($bytes.Length -ge 2 -and $bytes[1] -eq 0) {
+        [System.Text.Encoding]::Unicode.GetString($bytes)
+    }
+    elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0) {
+        [System.Text.Encoding]::BigEndianUnicode.GetString($bytes)
+    }
+    else {
+        [System.Text.Encoding]::UTF8.GetString($bytes)
+    }
+
+    $normalizedText = $text.Replace([string][char]0, "")
+    if ([string]::IsNullOrWhiteSpace($normalizedText)) {
+        return @()
+    }
+
+    return @(
+        $normalizedText -split "`r?`n" |
+        ForEach-Object { Normalize-ExternalOutputLine $_ } |
+        Where-Object { $_ -ne $null -and $_ -ne "" }
+    )
+}
+
 function Invoke-Native {
     param(
         [Parameter(Mandatory = $true)][string]$FilePath,
@@ -741,20 +794,16 @@ function Invoke-MsysCommand {
         [switch]$PassThruOutput
     )
 
-    Write-BuildLog ("MSYS komut: {0}" -f $Description)
-    $commandOutput = @(& $BashPath -lc $ScriptText 2>&1)
-    if ($commandOutput.Count -gt 0) {
-        $commandOutput | Tee-Object -FilePath $script:LogFile -Append | Out-Null
-    }
-    if ($LASTEXITCODE -ne 0) {
-        $outputSummary = ($commandOutput | Select-Object -Last 20 | ForEach-Object { $_.ToString() }) -join " || "
+    $result = Invoke-MsysCommandResult -BashPath $BashPath -ScriptText $ScriptText -Description $Description
+    if ($result.ExitCode -ne 0) {
+        $outputSummary = ($result.Output | Select-Object -Last 50) -join " || "
         if ([string]::IsNullOrWhiteSpace($outputSummary)) {
-            throw ("MSYS komut basarisiz oldu ({0}): {1}" -f $LASTEXITCODE, $Description)
+            throw ("MSYS komut basarisiz oldu ({0}): {1}" -f $result.ExitCode, $Description)
         }
-        throw ("MSYS komut basarisiz oldu ({0}): {1} | cikti={2}" -f $LASTEXITCODE, $Description, $outputSummary)
+        throw ("MSYS komut basarisiz oldu ({0}): {1} | cikti={2}" -f $result.ExitCode, $Description, $outputSummary)
     }
     if ($PassThruOutput) {
-        return @($commandOutput | ForEach-Object { $_.ToString() })
+        return $result.Output
     }
 }
 
@@ -766,14 +815,38 @@ function Invoke-MsysCommandResult {
     )
 
     Write-BuildLog ("MSYS komut: {0}" -f $Description)
-    $commandOutput = @(& $BashPath -lc $ScriptText 2>&1)
-    if ($commandOutput.Count -gt 0) {
-        $commandOutput | Tee-Object -FilePath $script:LogFile -Append | Out-Null
-    }
+    $stdoutFile = Join-Path $env:TEMP ("cigertool-msys-{0}.stdout.log" -f ([guid]::NewGuid().ToString("N")))
+    $stderrFile = Join-Path $env:TEMP ("cigertool-msys-{0}.stderr.log" -f ([guid]::NewGuid().ToString("N")))
 
-    return [pscustomobject]@{
-        ExitCode = $LASTEXITCODE
-        Output   = @($commandOutput | ForEach-Object { $_.ToString() })
+    try {
+        $process = Start-Process -FilePath $BashPath `
+            -ArgumentList @("-lc", $ScriptText) `
+            -WorkingDirectory (Get-Location).Path `
+            -Wait `
+            -PassThru `
+            -NoNewWindow `
+            -RedirectStandardOutput $stdoutFile `
+            -RedirectStandardError $stderrFile
+
+        $stdoutLines = @(Read-ExternalOutputFile -Path $stdoutFile)
+        $stderrLines = @(Read-ExternalOutputFile -Path $stderrFile)
+
+        foreach ($line in $stdoutLines) {
+            Write-BuildLog ("[stdout] {0}" -f $line)
+        }
+        foreach ($line in $stderrLines) {
+            Write-BuildLog ("[stderr] {0}" -f $line)
+        }
+
+        return [pscustomobject]@{
+            ExitCode = $process.ExitCode
+            Output   = @($stdoutLines + $stderrLines)
+            Stdout   = $stdoutLines
+            Stderr   = $stderrLines
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $stdoutFile, $stderrFile -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -1037,25 +1110,48 @@ function Build-IsoWithXorriso {
     $mediaRootWindowsPath = [System.IO.Path]::GetFullPath($MediaRoot)
     $isoWindowsPath = [System.IO.Path]::GetFullPath($IsoPath)
     $efiImageWindowsPath = [System.IO.Path]::GetFullPath((Join-Path $MediaRoot $EfiImageRelativePath.Replace("/", "\")))
+    $biosBootWindowsPath = [System.IO.Path]::GetFullPath((Join-Path $MediaRoot "boot\etfsboot.com"))
+    $bootWimWindowsPath = [System.IO.Path]::GetFullPath((Join-Path $MediaRoot "sources\boot.wim"))
     $isoParent = Split-Path $isoWindowsPath -Parent
 
-    Assert-Path -PathValue (Join-Path $mediaRootWindowsPath "boot\etfsboot.com") -Description "BIOS boot image"
+    Assert-Path -PathValue $biosBootWindowsPath -Description "BIOS boot image"
     Assert-Path -PathValue $efiImageWindowsPath -Description "UEFI boot image"
+    Assert-Path -PathValue $bootWimWindowsPath -Description "boot.wim"
     New-Item -ItemType Directory -Force -Path $isoParent | Out-Null
     Assert-Path -PathValue $isoParent -Description "ISO hedef klasoru"
 
     $msysMediaRoot = Convert-WindowsPathToMsysUsingBash -BashPath $BashPath -WindowsPath $mediaRootWindowsPath -Description "cygpath -u media root"
     $msysIsoPath = Convert-WindowsPathToMsysUsingBash -BashPath $BashPath -WindowsPath $isoWindowsPath -Description "cygpath -u ISO output"
     $msysEfiImagePath = Convert-WindowsPathToMsysUsingBash -BashPath $BashPath -WindowsPath $efiImageWindowsPath -Description "cygpath -u final efiboot.img"
+    $msysBiosBootPath = Convert-WindowsPathToMsysUsingBash -BashPath $BashPath -WindowsPath $biosBootWindowsPath -Description "cygpath -u BIOS boot image"
+    $msysBootWimPath = Convert-WindowsPathToMsysUsingBash -BashPath $BashPath -WindowsPath $bootWimWindowsPath -Description "cygpath -u boot.wim"
     Write-BuildLog ("xorriso media root Windows path: {0}" -f $mediaRootWindowsPath)
     Write-BuildLog ("xorriso ISO Windows path: {0}" -f $isoWindowsPath)
     Write-BuildLog ("xorriso UEFI image Windows path: {0}" -f $efiImageWindowsPath)
+    Write-BuildLog ("xorriso BIOS image Windows path: {0}" -f $biosBootWindowsPath)
+    Write-BuildLog ("xorriso boot.wim Windows path: {0}" -f $bootWimWindowsPath)
     Write-BuildLog ("xorriso media root MSYS path: {0}" -f $msysMediaRoot)
     Write-BuildLog ("xorriso ISO MSYS path: {0}" -f $msysIsoPath)
     Write-BuildLog ("xorriso UEFI image MSYS path: {0}" -f $msysEfiImagePath)
+    Write-BuildLog ("xorriso BIOS image MSYS path: {0}" -f $msysBiosBootPath)
+    Write-BuildLog ("xorriso boot.wim MSYS path: {0}" -f $msysBootWimPath)
+    Write-BuildLog ("xorriso input existence | media_root={0} | efiboot={1} | etfsboot={2} | bootwim={3} | iso_parent={4}" -f
+        (Test-Path -LiteralPath $mediaRootWindowsPath -PathType Container),
+        (Test-Path -LiteralPath $efiImageWindowsPath -PathType Leaf),
+        (Test-Path -LiteralPath $biosBootWindowsPath -PathType Leaf),
+        (Test-Path -LiteralPath $bootWimWindowsPath -PathType Leaf),
+        (Test-Path -LiteralPath $isoParent -PathType Container)
+    )
+    Write-BuildLog ("xorriso input sizes | efiboot_bytes={0} | bootwim_bytes={1} | etfsboot_bytes={2}" -f
+        (Get-Item -LiteralPath $efiImageWindowsPath).Length,
+        (Get-Item -LiteralPath $bootWimWindowsPath).Length,
+        (Get-Item -LiteralPath $biosBootWindowsPath).Length
+    )
 
     Assert-MsysVisiblePath -BashPath $BashPath -MsysPath $msysMediaRoot -Description "MSYS preflight media root" -PathKind directory
     Assert-MsysVisiblePath -BashPath $BashPath -MsysPath $msysEfiImagePath -Description "MSYS preflight final efiboot.img" -PathKind file
+    Assert-MsysVisiblePath -BashPath $BashPath -MsysPath $msysBiosBootPath -Description "MSYS preflight BIOS boot image" -PathKind file
+    Assert-MsysVisiblePath -BashPath $BashPath -MsysPath $msysBootWimPath -Description "MSYS preflight boot.wim" -PathKind file
 
     $quotedIso = Convert-ToBashSingleQuoted $msysIsoPath
     $quotedMediaRoot = Convert-ToBashSingleQuoted $msysMediaRoot
@@ -1065,7 +1161,7 @@ function Build-IsoWithXorriso {
         'export PATH=/usr/bin:/mingw64/bin:$PATH'
     )
     $xorrisoCommand = @(
-        'xorriso -as mkisofs',
+        'xorriso -report_about ALL -as mkisofs',
         "-iso-level 3",
         "-full-iso9660-filenames",
         "-volid CIGERTOOL",
@@ -1083,9 +1179,19 @@ function Build-IsoWithXorriso {
         "-o $quotedIso",
         $quotedMediaRoot
     ) -join " "
+    Write-BuildLog ("xorriso tam komut satiri: {0}" -f $xorrisoCommand)
     $xorrisoScript = New-MsysScript @(
         $toolchainSetup
         'which xorriso'
+        'echo "=== Xorriso Preflight: media root ==="'
+        "test -d $quotedMediaRoot"
+        "ls -ld $quotedMediaRoot"
+        'echo "=== Xorriso Preflight: EFI image ==="'
+        "test -f $(Convert-ToBashSingleQuoted $msysEfiImagePath)"
+        "ls -l $(Convert-ToBashSingleQuoted $msysEfiImagePath)"
+        'echo "=== Xorriso Preflight: BIOS image ==="'
+        "test -f $(Convert-ToBashSingleQuoted $msysBiosBootPath)"
+        "ls -l $(Convert-ToBashSingleQuoted $msysBiosBootPath)"
         $xorrisoCommand
     )
     Invoke-MsysCommand -BashPath $BashPath -Description "xorriso -as mkisofs -> $msysIsoPath" -ScriptText $xorrisoScript
