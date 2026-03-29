@@ -868,10 +868,17 @@ function Invoke-MsysCommandResult {
     Write-BuildLog ("MSYS komut: {0}" -f $Description)
     $stdoutFile = Join-Path $env:TEMP ("cigertool-msys-{0}.stdout.log" -f ([guid]::NewGuid().ToString("N")))
     $stderrFile = Join-Path $env:TEMP ("cigertool-msys-{0}.stderr.log" -f ([guid]::NewGuid().ToString("N")))
+    $wrappedScript = @(
+        'set +e'
+        $ScriptText
+        'msys_exit_code=$?'
+        'echo EXIT_CODE:$msys_exit_code'
+        'exit 0'
+    ) -join "`n"
 
     try {
         $process = Start-Process -FilePath $BashPath `
-            -ArgumentList @("--noprofile", "--norc", "-c", $ScriptText) `
+            -ArgumentList @("-lc", $wrappedScript) `
             -WorkingDirectory (Get-Location).Path `
             -Wait `
             -PassThru `
@@ -881,6 +888,15 @@ function Invoke-MsysCommandResult {
 
         $stdoutLines = @(Read-ExternalOutputFile -Path $stdoutFile)
         $stderrLines = @(Read-ExternalOutputFile -Path $stderrFile)
+        $exitCodeLine = $stdoutLines | Where-Object { $_ -match '^EXIT_CODE:(-?\d+)$' } | Select-Object -Last 1
+        if (-not $exitCodeLine) {
+            $stdoutSummary = ($stdoutLines | Select-Object -Last 50) -join " || "
+            $stderrSummary = ($stderrLines | Select-Object -Last 50) -join " || "
+            throw ("MSYS komut gercek cikis kodunu raporlamadi: {0} | stdout={1} | stderr={2}" -f $Description, $stdoutSummary, $stderrSummary)
+        }
+
+        $capturedExitCode = [int]([regex]::Match($exitCodeLine, '^EXIT_CODE:(-?\d+)$').Groups[1].Value)
+        $stdoutLines = @($stdoutLines | Where-Object { $_ -notmatch '^EXIT_CODE:(-?\d+)$' })
 
         foreach ($line in $stdoutLines) {
             Write-BuildLog ("[stdout] {0}" -f $line)
@@ -888,12 +904,14 @@ function Invoke-MsysCommandResult {
         foreach ($line in $stderrLines) {
             Write-BuildLog ("[stderr] {0}" -f $line)
         }
+        Write-BuildLog ("[result] MSYS exit code: {0}" -f $capturedExitCode)
 
         return [pscustomobject]@{
-            ExitCode = $process.ExitCode
+            ExitCode = $capturedExitCode
             Output   = @($stdoutLines + $stderrLines)
             Stdout   = $stdoutLines
             Stderr   = $stderrLines
+            BashExitCode = $process.ExitCode
         }
     }
     finally {
