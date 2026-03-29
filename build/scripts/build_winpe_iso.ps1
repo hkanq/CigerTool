@@ -340,7 +340,8 @@ function Resolve-CopypeArchitectureTokens {
 function Resolve-WinPeRequiredSourceFile {
     param(
         [Parameter(Mandatory = $true)][string]$ArchitectureRoot,
-        [Parameter(Mandatory = $true)][string]$RelativePath
+        [Parameter(Mandatory = $true)][string]$RelativePath,
+        [string]$AdkRoot
     )
 
     $searchRoot = $ArchitectureRoot
@@ -373,6 +374,54 @@ function Resolve-WinPeRequiredSourceFile {
             Select-Object -First 1
     }
 
+    if ($RelativePath -ieq "boot\etfsboot.com") {
+        Write-BuildLog "WinPE Media altinda etfsboot.com yok. ADK BIOS boot asset fallback aramasi baslatiliyor." "WARN"
+        $knownAdkRoots = @(
+            (Join-Path $AdkRoot "Deployment Tools\amd64\Oscdimg"),
+            (Join-Path $AdkRoot "Deployment Tools\x86\Oscdimg"),
+            (Join-Path $AdkRoot "Deployment Tools\arm64\Oscdimg"),
+            (Join-Path $AdkRoot "Deployment Tools\Oscdimg"),
+            (Join-Path $AdkRoot "Deployment Tools")
+        ) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Container) }
+
+        if ($knownAdkRoots.Count -gt 0) {
+            Write-BuildLog ("etfsboot.com icin ADK arama kokleri: {0}" -f ($knownAdkRoots -join ", "))
+        }
+        else {
+            Write-BuildLog "etfsboot.com icin bilinen ADK arama koku bulunamadi; genis ADK aramasi denenecek." "WARN"
+        }
+
+        $candidateFiles = @()
+        foreach ($root in $knownAdkRoots) {
+            Write-BuildLog ("etfsboot.com araniyor | root={0}" -f $root)
+            $candidateFiles += @(Get-ChildItem -LiteralPath $root -Recurse -Force -File -Filter "etfsboot.com" -ErrorAction SilentlyContinue)
+        }
+
+        if ($candidateFiles.Count -eq 0 -and -not [string]::IsNullOrWhiteSpace($AdkRoot) -and (Test-Path -LiteralPath $AdkRoot -PathType Container)) {
+            Write-BuildLog ("etfsboot.com icin genis ADK aramasi basliyor | root={0}" -f $AdkRoot) "WARN"
+            $candidateFiles = @(
+                Get-ChildItem -LiteralPath $AdkRoot -Recurse -Force -File -Filter "etfsboot.com" -ErrorAction SilentlyContinue
+            )
+        }
+
+        if ($candidateFiles.Count -gt 0) {
+            $uniqueCandidates = @($candidateFiles | Sort-Object -Property FullName -Unique)
+            Write-BuildLog ("etfsboot.com adaylari: {0}" -f (($uniqueCandidates | Select-Object -ExpandProperty FullName) -join " | "))
+            return $uniqueCandidates |
+                Sort-Object @{
+                    Expression = {
+                        if ($_.FullName -match '(?i)[\\/]Deployment Tools[\\/]amd64[\\/]Oscdimg[\\/]etfsboot\.com$') { return 0 }
+                        if ($_.FullName -match '(?i)[\\/]Oscdimg[\\/]etfsboot\.com$') { return 1 }
+                        return 10
+                    }
+                }, FullName |
+                Select-Object -First 1
+        }
+
+        Write-BuildLog "etfsboot.com icin ADK fallback adaylari bulunamadi." "WARN"
+        return $null
+    }
+
     $leafName = Split-Path $RelativePath -Leaf
     $candidateFiles = @(
         Get-ChildItem -LiteralPath $ArchitectureRoot -Recurse -Force -File -Filter $leafName -ErrorAction SilentlyContinue
@@ -396,7 +445,8 @@ function Ensure-WinPeStagedFile {
         [Parameter(Mandatory = $true)][string]$ArchitectureRoot,
         [Parameter(Mandatory = $true)][string]$SourceMediaRoot,
         [Parameter(Mandatory = $true)][string]$DestinationMediaRoot,
-        [Parameter(Mandatory = $true)][string]$RelativePath
+        [Parameter(Mandatory = $true)][string]$RelativePath,
+        [string]$AdkRoot
     )
 
     $stagedPath = Join-Path $DestinationMediaRoot $RelativePath
@@ -409,7 +459,7 @@ function Ensure-WinPeStagedFile {
     }
 
     Write-BuildLog ("Staged path eksik, fallback arama basliyor | staged={0} | search_root={1}" -f $stagedPath, $ArchitectureRoot) "WARN"
-    $selectedCandidate = Resolve-WinPeRequiredSourceFile -ArchitectureRoot $ArchitectureRoot -RelativePath $RelativePath
+    $selectedCandidate = Resolve-WinPeRequiredSourceFile -ArchitectureRoot $ArchitectureRoot -RelativePath $RelativePath -AdkRoot $AdkRoot
     if (-not $selectedCandidate) {
         throw ("Gerekli WinPE dosyasi bulunamadi | staged={0} | beklenen kaynak={1} | mimari kok={2}" -f $stagedPath, $preferredSource, $ArchitectureRoot)
     }
@@ -430,7 +480,8 @@ function Stage-WinPeWorkspaceManually {
     param(
         [Parameter(Mandatory = $true)][string]$ArchitectureRoot,
         [Parameter(Mandatory = $true)][string]$SourceMediaRoot,
-        [Parameter(Mandatory = $true)][string]$WorkRoot
+        [Parameter(Mandatory = $true)][string]$WorkRoot,
+        [string]$AdkRoot
     )
 
     $destinationMediaRoot = Join-Path $WorkRoot "media"
@@ -497,7 +548,7 @@ function Stage-WinPeWorkspaceManually {
         $validatedPaths = New-Object System.Collections.Generic.List[string]
         foreach ($relativePath in $requiredRelativePaths) {
             $lastManualStep = "gerekli path dogrulama: $relativePath"
-            $validatedPath = Ensure-WinPeStagedFile -ArchitectureRoot $ArchitectureRoot -SourceMediaRoot $SourceMediaRoot -DestinationMediaRoot $destinationMediaRoot -RelativePath $relativePath
+            $validatedPath = Ensure-WinPeStagedFile -ArchitectureRoot $ArchitectureRoot -SourceMediaRoot $SourceMediaRoot -DestinationMediaRoot $destinationMediaRoot -RelativePath $relativePath -AdkRoot $AdkRoot
             $validatedPaths.Add($validatedPath)
         }
 
@@ -909,7 +960,7 @@ if (-not $copypeSucceeded) {
         ($copypeTokenCandidates -join ", "),
         $copypeLastError.Exception.Message
     ) "WARN"
-    Stage-WinPeWorkspaceManually -ArchitectureRoot $winPeLayout.ArchitectureRoot -SourceMediaRoot $winPeLayout.MediaRoot -WorkRoot $workRoot
+    Stage-WinPeWorkspaceManually -ArchitectureRoot $winPeLayout.ArchitectureRoot -SourceMediaRoot $winPeLayout.MediaRoot -WorkRoot $workRoot -AdkRoot $adkRoot
     $manualStagingUsed = $true
 }
 elseif ($copypeSucceeded) {
