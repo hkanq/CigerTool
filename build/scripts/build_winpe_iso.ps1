@@ -784,12 +784,24 @@ function Get-ConservativeEfiImageSizePlan {
         [double]512MB,
         [double]([Math]::Ceiling($computedBytes / 64MB) * 64MB)
     )
-    $retryCandidateBytes = [long][Math]::Max(
-        [double]1GB,
-        [double]($firstBytes * 2),
-        [double]([Math]::Ceiling((($efiBytes * 6) + 512MB) / 128MB) * 128MB)
-    )
+    $retryFromDouble = [double]($firstBytes * 2)
+    $retryFromTree = [double]([Math]::Ceiling((($efiBytes * 6) + 512MB) / 128MB) * 128MB)
+    $retryCandidateBytes = [long]([Math]::Max(
+        [Math]::Max(
+            [double]1GB,
+            $retryFromDouble
+        ),
+        $retryFromTree
+    ))
     $retryBytes = [long]([Math]::Ceiling($retryCandidateBytes / 128MB) * 128MB)
+
+    Write-BuildLog (
+        "EFI sizing helper | source_bytes={0} | first_pass_bytes={1} | min_enforced_bytes={2} | final_first_bytes={3}" -f
+        $efiBytes,
+        $computedBytes,
+        512MB,
+        $firstBytes
+    )
 
     return [pscustomobject]@{
         EfiBytes               = $efiBytes
