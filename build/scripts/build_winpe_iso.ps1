@@ -926,14 +926,12 @@ function New-EfiBootImage {
         'which mformat'
         "mformat -i $quotedImage -F -v CIGERTOOL_EFI ::"
     )
-    Invoke-MsysCommand -BashPath $BashPath -Description "mformat -i $msysImagePath -F -v CIGERTOOL_EFI ::" -ScriptText $mformatScript
 
     $mmdScript = New-MsysScript @(
         $toolchainSetup
         'which mmd'
         "mmd -i $quotedImage ::/EFI"
     )
-    Invoke-MsysCommand -BashPath $BashPath -Description "mmd -i $msysImagePath ::/EFI" -ScriptText $mmdScript
 
     $mcopyScript = New-MsysScript @(
         $toolchainSetup
