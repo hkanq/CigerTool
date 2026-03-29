@@ -680,13 +680,43 @@ function Invoke-MsysCommand {
     param(
         [Parameter(Mandatory = $true)][string]$BashPath,
         [Parameter(Mandatory = $true)][string]$ScriptText,
+        [Parameter(Mandatory = $true)][string]$Description,
+        [switch]$PassThruOutput
+    )
+
+    Write-BuildLog ("MSYS komut: {0}" -f $Description)
+    $commandOutput = @(& $BashPath -lc $ScriptText 2>&1)
+    if ($commandOutput.Count -gt 0) {
+        $commandOutput | Tee-Object -FilePath $script:LogFile -Append | Out-Null
+    }
+    if ($LASTEXITCODE -ne 0) {
+        $outputSummary = ($commandOutput | Select-Object -Last 20 | ForEach-Object { $_.ToString() }) -join " || "
+        if ([string]::IsNullOrWhiteSpace($outputSummary)) {
+            throw ("MSYS komut basarisiz oldu ({0}): {1}" -f $LASTEXITCODE, $Description)
+        }
+        throw ("MSYS komut basarisiz oldu ({0}): {1} | cikti={2}" -f $LASTEXITCODE, $Description, $outputSummary)
+    }
+    if ($PassThruOutput) {
+        return @($commandOutput | ForEach-Object { $_.ToString() })
+    }
+}
+
+function Invoke-MsysCommandResult {
+    param(
+        [Parameter(Mandatory = $true)][string]$BashPath,
+        [Parameter(Mandatory = $true)][string]$ScriptText,
         [Parameter(Mandatory = $true)][string]$Description
     )
 
     Write-BuildLog ("MSYS komut: {0}" -f $Description)
-    & $BashPath -lc $ScriptText 2>&1 | Tee-Object -FilePath $script:LogFile -Append | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw ("MSYS komut basarisiz oldu ({0}): {1}" -f $LASTEXITCODE, $Description)
+    $commandOutput = @(& $BashPath -lc $ScriptText 2>&1)
+    if ($commandOutput.Count -gt 0) {
+        $commandOutput | Tee-Object -FilePath $script:LogFile -Append | Out-Null
+    }
+
+    return [pscustomobject]@{
+        ExitCode = $LASTEXITCODE
+        Output   = @($commandOutput | ForEach-Object { $_.ToString() })
     }
 }
 
@@ -732,6 +762,51 @@ function Validate-MediaLayout {
     }
 }
 
+function Get-ConservativeEfiImageSizePlan {
+    param(
+        [Parameter(Mandatory = $true)][string]$EfiRoot
+    )
+
+    $files = @(Get-ChildItem -LiteralPath $EfiRoot -Recurse -Force -File -ErrorAction Stop)
+    $directories = @(Get-ChildItem -LiteralPath $EfiRoot -Recurse -Force -Directory -ErrorAction Stop)
+    $efiBytes = [long](($files | Measure-Object -Property Length -Sum).Sum)
+    if (-not $efiBytes) {
+        $efiBytes = 0
+    }
+
+    $directoryOverheadBytes = [long]($directories.Count * 256KB)
+    $fileSlackBytes = [long]($files.Count * 128KB)
+    $fatOverheadBytes = [long]([Math]::Max([double]128MB, [double]([Math]::Ceiling($efiBytes * 0.75))))
+    $rawRequiredBytes = [long]($efiBytes + $directoryOverheadBytes + $fileSlackBytes + $fatOverheadBytes)
+    $safetyMarginBytes = [long]([Math]::Max([double]256MB, [double]([Math]::Ceiling($rawRequiredBytes * 1.0))))
+    $computedBytes = [long]($rawRequiredBytes + $safetyMarginBytes)
+    $firstBytes = [long][Math]::Max(
+        [double]512MB,
+        [double]([Math]::Ceiling($computedBytes / 64MB) * 64MB)
+    )
+    $retryCandidateBytes = [long][Math]::Max(
+        [double]1GB,
+        [double]($firstBytes * 2),
+        [double]([Math]::Ceiling((($efiBytes * 6) + 512MB) / 128MB) * 128MB)
+    )
+    $retryBytes = [long]([Math]::Ceiling($retryCandidateBytes / 128MB) * 128MB)
+
+    return [pscustomobject]@{
+        EfiBytes               = $efiBytes
+        FileCount              = $files.Count
+        DirectoryCount         = $directories.Count
+        DirectoryOverheadBytes = $directoryOverheadBytes
+        FileSlackBytes         = $fileSlackBytes
+        FatOverheadBytes       = $fatOverheadBytes
+        RawRequiredBytes       = $rawRequiredBytes
+        SafetyMarginBytes      = $safetyMarginBytes
+        FirstBytes             = $firstBytes
+        FirstMiB               = [long]([Math]::Round($firstBytes / 1MB, 0))
+        RetryBytes             = $retryBytes
+        RetryMiB               = [long]([Math]::Round($retryBytes / 1MB, 0))
+    }
+}
+
 function New-EfiBootImage {
     param(
         [string]$BashPath,
@@ -746,18 +821,12 @@ function New-EfiBootImage {
         Remove-Item -Force $ImagePath
     }
 
-    $efiBytes = (Get-ChildItem -Path $efiRoot -Recurse -File | Measure-Object -Property Length -Sum).Sum
-    if (-not $efiBytes) {
-        $efiBytes = 0
-    }
-    $imageBytes = [Math]::Max(64MB, [long]([Math]::Ceiling(($efiBytes + 16MB) / 1MB) * 1MB))
-    $stream = [System.IO.File]::Open($ImagePath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
-    try {
-        $stream.SetLength($imageBytes)
-    }
-    finally {
-        $stream.Dispose()
-    }
+    $sizePlan = Get-ConservativeEfiImageSizePlan -EfiRoot $efiRoot
+    Write-BuildLog ("EFI kaynak agaci: {0}" -f $efiRoot)
+    Write-BuildLog ("EFI kaynak boyutu (recursive bytes): {0}" -f $sizePlan.EfiBytes)
+    Write-BuildLog ("EFI kaynak istatistikleri | dosya={0} | dizin={1}" -f $sizePlan.FileCount, $sizePlan.DirectoryCount)
+    Write-BuildLog ("EFI ham gereksinim | file_bytes={0} | dir_overhead={1} | file_slack={2} | fat_overhead={3} | raw_required={4}" -f $sizePlan.EfiBytes, $sizePlan.DirectoryOverheadBytes, $sizePlan.FileSlackBytes, $sizePlan.FatOverheadBytes, $sizePlan.RawRequiredBytes)
+    Write-BuildLog ("EFI image boyut plani | margin={0} | first_bytes={1} | first_mib={2} | retry_bytes={3} | retry_mib={4}" -f $sizePlan.SafetyMarginBytes, $sizePlan.FirstBytes, $sizePlan.FirstMiB, $sizePlan.RetryBytes, $sizePlan.RetryMiB)
 
     $msysImagePath = Convert-ToMsysPath $ImagePath
     $msysEfiRoot = Convert-ToMsysPath $efiRoot
@@ -789,8 +858,57 @@ function New-EfiBootImage {
         'which mcopy'
         "mcopy -i $quotedImage -s $quotedEfiRoot ::"
     )
-    Invoke-MsysCommand -BashPath $BashPath -Description "mcopy -i $msysImagePath -s $msysEfiRoot ::" -ScriptText $mcopyScript
-    Write-BuildLog "UEFI boot image olusturuldu: $ImagePath"
+
+    $attemptSizes = @(
+        [long]$sizePlan.FirstBytes,
+        [long]$sizePlan.RetryBytes
+    ) | Select-Object -Unique
+
+    $imageCreated = $false
+    $lastEfiError = $null
+    $lastMcopyOutputSummary = ""
+    for ($attemptIndex = 0; $attemptIndex -lt $attemptSizes.Count; $attemptIndex++) {
+        $currentImageBytes = [long]$attemptSizes[$attemptIndex]
+        $currentImageMiB = [long]([Math]::Round($currentImageBytes / 1MB, 0))
+        Write-BuildLog ("EFI image olusturma denemesi | deneme={0}/{1} | image_path={2} | final_bytes={3} | final_mib={4}" -f ($attemptIndex + 1), $attemptSizes.Count, $ImagePath, $currentImageBytes, $currentImageMiB)
+
+        if (Test-Path -LiteralPath $ImagePath) {
+            Remove-Item -LiteralPath $ImagePath -Force
+        }
+
+        $stream = [System.IO.File]::Open($ImagePath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+        try {
+            $stream.SetLength($currentImageBytes)
+        }
+        finally {
+            $stream.Dispose()
+        }
+
+        Invoke-MsysCommand -BashPath $BashPath -Description "mformat -i $msysImagePath -F -v CIGERTOOL_EFI ::" -ScriptText $mformatScript
+        Invoke-MsysCommand -BashPath $BashPath -Description "mmd -i $msysImagePath ::/EFI" -ScriptText $mmdScript
+
+        $mcopyResult = Invoke-MsysCommandResult -BashPath $BashPath -Description "mcopy -i $msysImagePath -s $msysEfiRoot ::" -ScriptText $mcopyScript
+        $lastMcopyOutputSummary = ($mcopyResult.Output | Select-Object -Last 50) -join " || "
+        if ($mcopyResult.ExitCode -eq 0) {
+            $imageCreated = $true
+            Write-BuildLog ("UEFI boot image olusturuldu | image_path={0} | final_bytes={1} | final_mib={2}" -f $ImagePath, $currentImageBytes, $currentImageMiB)
+            break
+        }
+
+        $lastEfiError = "MSYS komut basarisiz oldu ({0}): {1} | cikti={2}" -f $mcopyResult.ExitCode, "mcopy -i $msysImagePath -s $msysEfiRoot ::", $lastMcopyOutputSummary
+        Write-BuildLog ("EFI mcopy hatasi | deneme={0} | image_path={1} | final_bytes={2} | exit_code={3} | cikti={4}" -f ($attemptIndex + 1), $ImagePath, $currentImageBytes, $mcopyResult.ExitCode, $lastMcopyOutputSummary) "WARN"
+        $isDiskFull = $lastMcopyOutputSummary -match '(?i)disk full'
+        if ($isDiskFull -and $attemptIndex -lt ($attemptSizes.Count - 1)) {
+            Write-BuildLog ("EFI image kopyasi disk full nedeniyle yeniden daha buyuk boyutla denenecek | ilk_bytes={0} | retry_bytes={1}" -f $sizePlan.FirstBytes, $sizePlan.RetryBytes) "WARN"
+            continue
+        }
+
+        throw ("UEFI boot image mcopy basarisiz oldu | efi_tree_bytes={0} | first_image_bytes={1} | retry_image_bytes={2} | cikti={3}" -f $sizePlan.EfiBytes, $sizePlan.FirstBytes, $sizePlan.RetryBytes, $lastMcopyOutputSummary)
+    }
+
+    if (-not $imageCreated) {
+        throw ("UEFI boot image olusturulamadi | efi_tree_bytes={0} | first_image_bytes={1} | retry_image_bytes={2} | hata={3}" -f $sizePlan.EfiBytes, $sizePlan.FirstBytes, $sizePlan.RetryBytes, $lastEfiError)
+    }
 }
 
 function Build-IsoWithXorriso {
