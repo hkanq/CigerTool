@@ -828,6 +828,15 @@ function New-EfiBootImage {
 
     $efiRoot = Join-Path $MediaRoot "EFI"
     Assert-Path -PathValue $efiRoot -Description "EFI klasoru"
+    $imageParent = Split-Path $ImagePath -Parent
+    Write-BuildLog ("EFI image Windows path: {0}" -f $ImagePath)
+    Write-BuildLog ("EFI image parent dizin: {0}" -f $imageParent)
+    Write-BuildLog ("EFI image parent dizin mevcut mu (oncesi): {0}" -f (Test-Path -LiteralPath $imageParent -PathType Container))
+    New-Item -ItemType Directory -Force -Path $imageParent | Out-Null
+    if (-not (Test-Path -LiteralPath $imageParent -PathType Container)) {
+        throw ("EFI image parent dizin olusturulamadi: {0}" -f $imageParent)
+    }
+    Write-BuildLog ("EFI image parent dizin mevcut mu (sonrasi): {0}" -f (Test-Path -LiteralPath $imageParent -PathType Container))
 
     if (Test-Path $ImagePath) {
         Remove-Item -Force $ImagePath
@@ -842,6 +851,7 @@ function New-EfiBootImage {
 
     $msysImagePath = Convert-ToMsysPath $ImagePath
     $msysEfiRoot = Convert-ToMsysPath $efiRoot
+    Write-BuildLog ("EFI image MSYS path: {0}" -f $msysImagePath)
     $quotedImage = Convert-ToBashSingleQuoted $msysImagePath
     $quotedEfiRoot = Convert-ToBashSingleQuoted $msysEfiRoot
     $toolchainSetup = @(
@@ -888,12 +898,29 @@ function New-EfiBootImage {
             Remove-Item -LiteralPath $ImagePath -Force
         }
 
+        New-Item -ItemType Directory -Force -Path $imageParent | Out-Null
+        $parentExists = Test-Path -LiteralPath $imageParent -PathType Container
+        Write-BuildLog ("EFI image parent dizin durumu | deneme={0} | exists={1}" -f ($attemptIndex + 1), $parentExists)
+        if (-not $parentExists) {
+            throw ("EFI image parent dizin mformat oncesi eksik: {0}" -f $imageParent)
+        }
+
         $stream = [System.IO.File]::Open($ImagePath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
         try {
             $stream.SetLength($currentImageBytes)
         }
         finally {
             $stream.Dispose()
+        }
+
+        $imageExists = Test-Path -LiteralPath $ImagePath -PathType Leaf
+        $actualImageLength = if ($imageExists) { (Get-Item -LiteralPath $ImagePath).Length } else { -1 }
+        Write-BuildLog ("EFI image dosya durumu | deneme={0} | exists={1} | size_bytes={2}" -f ($attemptIndex + 1), $imageExists, $actualImageLength)
+        if (-not $imageExists) {
+            throw ("EFI image dosyasi mformat oncesi bulunamadi: {0}" -f $ImagePath)
+        }
+        if ($actualImageLength -ne $currentImageBytes) {
+            throw ("EFI image dosya boyutu beklenenle eslesmiyor | path={0} | actual={1} | expected={2}" -f $ImagePath, $actualImageLength, $currentImageBytes)
         }
 
         Invoke-MsysCommand -BashPath $BashPath -Description "mformat -i $msysImagePath -F -v CIGERTOOL_EFI ::" -ScriptText $mformatScript
