@@ -151,6 +151,27 @@ jobs:
         run: |
           .\build\scripts\build_winpe_iso.ps1 -OutputIso "artifacts\CigerTool-by-hkannq.iso" -RequirePrebootMenu
 
+      - name: Summarize build log on failure
+        if: failure()
+        shell: powershell
+        run: |
+          $logPath = "artifacts\logs\winpe-build.log"
+          if (-not (Test-Path $logPath)) {
+            Write-Host "Build log bulunamadi: $logPath"
+            "Build log bulunamadi: $logPath" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            exit 0
+          }
+          $tail = Get-Content $logPath -Tail 200
+          Write-Host "===== WINPE BUILD LOG TAIL ====="
+          $tail | ForEach-Object { Write-Host $_ }
+          @(
+            "## WinPE Build Log Tail"
+            ""
+            '```text'
+            ($tail -join [Environment]::NewLine)
+            '```'
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
       - name: Validate ISO artifact
         shell: powershell
         run: |
