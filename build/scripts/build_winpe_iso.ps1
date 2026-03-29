@@ -1131,13 +1131,17 @@ function New-EfiBootImage {
             throw ("EFI image parent dizin mformat oncesi eksik: {0}" -f $imageParent)
         }
 
-        $stream = [System.IO.File]::Open($efiImageWindowsPath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
         try {
-            $stream.SetLength($currentImageBytes)
+            & fsutil.exe file createnew $efiImageWindowsPath $currentImageBytes | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                throw ("fsutil createnew cikis kodu: {0}" -f $LASTEXITCODE)
+            }
         }
-        finally {
-            $stream.Dispose()
+        catch {
+            Write-BuildLog ("fsutil createnew basarisiz, byte-array fallback kullaniliyor | path={0} | bytes={1} | hata={2}" -f $efiImageWindowsPath, $currentImageBytes, $_.Exception.Message) "WARN"
+            [System.IO.File]::WriteAllBytes($efiImageWindowsPath, (New-Object byte[] $currentImageBytes))
         }
+        Write-BuildLog ("EFI image file created: {0} ({1} bytes)" -f $efiImageWindowsPath, $currentImageBytes)
 
         $imageExists = Test-Path -LiteralPath $efiImageWindowsPath -PathType Leaf
         $actualImageLength = if ($imageExists) { (Get-Item -LiteralPath $efiImageWindowsPath).Length } else { -1 }
