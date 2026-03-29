@@ -986,7 +986,20 @@ function New-EfiBootImage {
             throw ("EFI image dosya boyutu sifir veya negatif | path={0} | actual={1}" -f $efiImageWindowsPath, $actualImageLength)
         }
 
-        Assert-MsysVisiblePath -BashPath $BashPath -MsysPath $msysImagePath -Description ("MSYS preflight ls -l efiboot.img deneme {0}" -f ($attemptIndex + 1)) -PathKind file
+        try {
+            Assert-MsysVisiblePath -BashPath $BashPath -MsysPath $msysImagePath -Description ("MSYS preflight ls -l efiboot.img deneme {0}" -f ($attemptIndex + 1)) -PathKind file
+        }
+        catch {
+            throw (
+                "EFI image MSYS preflight basarisiz | windows_path={0} | msys_path={1} | parent_exists={2} | file_exists={3} | file_length={4} | hata={5}" -f
+                $efiImageWindowsPath,
+                $msysImagePath,
+                $parentExists,
+                $imageExists,
+                $actualImageLength,
+                $_.Exception.Message
+            )
+        }
 
         Invoke-MsysCommand -BashPath $BashPath -Description "mformat -i $msysImagePath -F -v CIGERTOOL_EFI ::" -ScriptText $mformatScript
         Invoke-MsysCommand -BashPath $BashPath -Description "mmd -i $msysImagePath ::/EFI" -ScriptText $mmdScript
