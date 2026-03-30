@@ -913,7 +913,7 @@ function Invoke-MsysCommandResult {
     try {
         $workingDirectory = (Get-Location).Path
         $process = Start-Process -FilePath $BashPath `
-            -ArgumentList @("--noprofile", "--norc", "-c", $wrappedScript) `
+            -ArgumentList $bashArguments `
             -WorkingDirectory $workingDirectory `
             -RedirectStandardOutput $stdoutFile `
             -RedirectStandardError $stderrFile `
