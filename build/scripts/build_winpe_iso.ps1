@@ -906,15 +906,16 @@ function Invoke-MsysCommandResult {
     }) -join " "))
 
     try {
-        $previousLocation = Get-Location
-        try {
-            Set-Location -LiteralPath $previousLocation.Path
-            & $BashPath --noprofile --norc -c $wrappedScript 1> $stdoutFile 2> $stderrFile
-            $nativeExitCode = $LASTEXITCODE
-        }
-        finally {
-            Set-Location -LiteralPath $previousLocation.Path
-        }
+        $workingDirectory = (Get-Location).Path
+        $process = Start-Process -FilePath $BashPath `
+            -ArgumentList @("--noprofile", "--norc", "-c", $wrappedScript) `
+            -WorkingDirectory $workingDirectory `
+            -RedirectStandardOutput $stdoutFile `
+            -RedirectStandardError $stderrFile `
+            -Wait `
+            -PassThru `
+            -NoNewWindow
+        $nativeExitCode = $process.ExitCode
 
         $stdoutLines = @(Read-ExternalOutputFile -Path $stdoutFile)
         $stderrLines = @(Read-ExternalOutputFile -Path $stderrFile)
