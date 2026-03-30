@@ -1230,10 +1230,13 @@ function Build-IsoWithXorriso {
         [string]$EfiImageRelativePath
     )
 
+    $biosBootIsoPath = "Boot/etfsboot.com"
+    $bootCatalogIsoPath = "Boot/boot.cat"
+    $efiImageIsoPath = $EfiImageRelativePath.Replace("\", "/")
     $mediaRootWindowsPath = [System.IO.Path]::GetFullPath($MediaRoot)
     $isoWindowsPath = [System.IO.Path]::GetFullPath($IsoPath)
-    $efiImageWindowsPath = [System.IO.Path]::GetFullPath((Join-Path $MediaRoot $EfiImageRelativePath.Replace("/", "\")))
-    $biosBootWindowsPath = [System.IO.Path]::GetFullPath((Join-Path $MediaRoot "boot\etfsboot.com"))
+    $efiImageWindowsPath = [System.IO.Path]::GetFullPath((Join-Path $MediaRoot $efiImageIsoPath.Replace("/", "\")))
+    $biosBootWindowsPath = [System.IO.Path]::GetFullPath((Join-Path $MediaRoot $biosBootIsoPath.Replace("/", "\")))
     $bootWimWindowsPath = [System.IO.Path]::GetFullPath((Join-Path $MediaRoot "sources\boot.wim"))
     $isoParent = Split-Path $isoWindowsPath -Parent
 
@@ -1267,6 +1270,7 @@ function Build-IsoWithXorriso {
     Write-BuildLog ("xorriso UEFI image MSYS path: {0}" -f $msysEfiImagePath)
     Write-BuildLog ("xorriso BIOS image MSYS path: {0}" -f $msysBiosBootPath)
     Write-BuildLog ("xorriso boot.wim MSYS path: {0}" -f $msysBootWimPath)
+    Write-BuildLog ("xorriso ISO ici yol referanslari | bios={0} | catalog={1} | efi={2}" -f $biosBootIsoPath, $bootCatalogIsoPath, $efiImageIsoPath)
     Write-BuildLog ("xorriso final MSYS pathleri | media={0} | iso={1} | efiboot={2} | bios={3} | bootwim={4}" -f $msysMediaRoot, $msysIsoPath, $msysEfiImagePath, $msysBiosBootPath, $msysBootWimPath)
     Write-BuildLog ("xorriso input existence | media_root={0} | efiboot={1} | etfsboot={2} | bootwim={3} | iso_parent={4}" -f
         (Test-Path -LiteralPath $mediaRootWindowsPath -PathType Container),
@@ -1288,7 +1292,7 @@ function Build-IsoWithXorriso {
 
     $quotedIso = Convert-ToBashSingleQuoted $msysIsoPath
     $quotedMediaRoot = Convert-ToBashSingleQuoted $msysMediaRoot
-    $quotedEfiImage = Convert-ToBashSingleQuoted $EfiImageRelativePath
+    $quotedEfiImage = Convert-ToBashSingleQuoted $efiImageIsoPath
     $toolchainSetup = @(
         'export MSYSTEM=MSYS'
         'export PATH=/usr/bin:/mingw64/bin:$PATH'
@@ -1298,10 +1302,10 @@ function Build-IsoWithXorriso {
         "-iso-level 3",
         "-full-iso9660-filenames",
         "-volid CIGERTOOL",
-        "-eltorito-boot boot/etfsboot.com",
+        "-eltorito-boot $biosBootIsoPath",
         "-no-emul-boot",
         "-boot-load-size 8",
-        "-eltorito-catalog boot/boot.cat",
+        "-eltorito-catalog $bootCatalogIsoPath",
         "-eltorito-alt-boot",
         "-e $quotedEfiImage",
         "-no-emul-boot",
@@ -1549,7 +1553,7 @@ catch {
 
 Validate-MediaLayout -MediaRoot $mediaRoot -PrebootRequired ([bool]$RequirePrebootMenu)
 
-$efiImageRelativePath = "efi/cigertool/efiboot.img"
+$efiImageRelativePath = "EFI/CigerTool/efiboot.img"
 $efiImagePath = Join-Path $mediaRoot $efiImageRelativePath.Replace("/", "\")
 $efiImageBuildPath = Join-Path $workRoot "staging\efiboot.img"
 Write-BuildLog ("EFI image gecici build path: {0}" -f $efiImageBuildPath)
