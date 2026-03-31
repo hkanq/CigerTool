@@ -108,93 +108,103 @@ jobs:
 
     steps:
       - name: Prepare local release repository
-        id: local_repo
-        shell: powershell
+        shell: cmd
         run: |
-          $repoRoot = $env:SELF_HOSTED_REPO_ROOT
-          $repoParent = Split-Path -Path $repoRoot -Parent
-          New-Item -ItemType Directory -Force -Path $repoParent | Out-Null
+          @echo off
+          set "REPO_ROOT=%SELF_HOSTED_REPO_ROOT%"
+          set "REPO_PARENT=%REPO_ROOT%\.."
+          if not exist "%REPO_PARENT%" mkdir "%REPO_PARENT%"
+          set "REMOTE_URL=https://x-access-token:%GITHUB_TOKEN%@github.com/%GITHUB_REPOSITORY%.git"
 
-          $remoteUrl = "https://x-access-token:$env:GITHUB_TOKEN@github.com/$env:GITHUB_REPOSITORY.git"
+          if not exist "%REPO_ROOT%\.git" (
+            git clone "%REMOTE_URL%" "%REPO_ROOT%"
+          ) else (
+            git -C "%REPO_ROOT%" remote set-url origin "%REMOTE_URL%"
+          )
 
-          if (-not (Test-Path -LiteralPath (Join-Path $repoRoot ".git"))) {
-            git clone $remoteUrl $repoRoot
-          } else {
-            git -C $repoRoot remote set-url origin $remoteUrl
-          }
-
-          git -C $repoRoot fetch --prune origin
-          git -C $repoRoot checkout --force $env:GITHUB_SHA
-          git -C $repoRoot reset --hard $env:GITHUB_SHA
-
-          "repo_root=$repoRoot" >> $env:GITHUB_OUTPUT
-          Write-Host "Release repo root: $repoRoot"
+          git -C "%REPO_ROOT%" fetch --prune origin
+          git -C "%REPO_ROOT%" checkout --force "%GITHUB_SHA%"
+          git -C "%REPO_ROOT%" reset --hard "%GITHUB_SHA%"
+          echo Release repo root: %REPO_ROOT%
 
       - name: Validate local workspace input
-        shell: powershell
+        shell: cmd
         run: |
-          $repoRoot = "${{ steps.local_repo.outputs.repo_root }}"
-          $workspaceWim = Join-Path $repoRoot "inputs\workspace\install.wim"
-          $logRoot = Join-Path $repoRoot "artifacts\logs"
-          New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
-          if (-not (Test-Path -LiteralPath $workspaceWim)) {
-            throw "Release mode icin gereken yerel girdi bulunamadi: $workspaceWim"
-          }
-          Get-Item $workspaceWim | Format-List FullName,Length,LastWriteTime
-          Set-Content -Path (Join-Path $logRoot "workspace-input.log") -Value "mode=release`nsource=persistent-local-repo`npath=$workspaceWim" -Encoding utf8
+          @echo off
+          set "REPO_ROOT=%SELF_HOSTED_REPO_ROOT%"
+          set "WORKSPACE_WIM=%REPO_ROOT%\inputs\workspace\install.wim"
+          set "LOG_ROOT=%REPO_ROOT%\artifacts\logs"
+          if not exist "%LOG_ROOT%" mkdir "%LOG_ROOT%"
+          if not exist "%WORKSPACE_WIM%" (
+            echo Release mode icin gereken yerel girdi bulunamadi: %WORKSPACE_WIM%
+            exit /b 1
+          )
+          (
+            echo mode=release
+            echo source=persistent-local-repo
+            echo path=%WORKSPACE_WIM%
+          ) > "%LOG_ROOT%\workspace-input.log"
+          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "Get-Item -LiteralPath '%WORKSPACE_WIM%' | Format-List FullName,Length,LastWriteTime"
 
       - name: Validate local Python
-        shell: powershell
+        shell: cmd
         run: |
-          $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
-          if (-not $pythonCmd) {
-            throw "Self-hosted release runner uzerinde python bulunamadi. Python 3.12+ kurun ve PATH'e ekleyin."
-          }
-          $pythonVersion = & python -c "import sys; print('.'.join(map(str, sys.version_info[:3])))"
-          if ([version]$pythonVersion -lt [version]"3.12.0") {
-            throw "Self-hosted release runner uzerindeki Python surumu yetersiz: $pythonVersion. Python 3.12+ gerekir."
-          }
-          Write-Host "Python surumu: $pythonVersion"
+          @echo off
+          where python >nul 2>nul || (
+            echo Self-hosted release runner uzerinde python bulunamadi. Python 3.12+ kurun ve PATH'e ekleyin.
+            exit /b 1
+          )
+          for /f %%i in ('python -c "import sys; print('.'.join(map(str, sys.version_info[:3])))"') do set "PYTHON_VERSION=%%i"
+          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$v=[version]'%PYTHON_VERSION%'; if ($v -lt [version]'3.12.0') { throw 'Self-hosted release runner uzerindeki Python surumu yetersiz: %PYTHON_VERSION%. Python 3.12+ gerekir.' }"
+          echo Python surumu: %PYTHON_VERSION%
 
       - name: Install Python dependencies
-        shell: powershell
-        working-directory: ${{ steps.local_repo.outputs.repo_root }}
+        shell: cmd
+        working-directory: ${{ env.SELF_HOSTED_REPO_ROOT }}
         run: |
+          @echo off
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
       - name: Build release ISO
-        shell: powershell
-        working-directory: ${{ steps.local_repo.outputs.repo_root }}
+        shell: cmd
+        working-directory: ${{ env.SELF_HOSTED_REPO_ROOT }}
         run: |
-          .\build\build_cigertool_release.ps1 -WorkspaceWimPath "inputs\workspace\install.wim"
+          @echo off
+          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ".\build\build_cigertool_release.ps1" -WorkspaceWimPath "inputs\workspace\install.wim"
 
       - name: Validate release artifacts
-        shell: powershell
-        working-directory: ${{ steps.local_repo.outputs.repo_root }}
+        shell: cmd
+        working-directory: ${{ env.SELF_HOSTED_REPO_ROOT }}
         run: |
-          $requiredPaths = @(
-            "artifacts\CigerTool-Workspace.iso",
-            "artifacts\CigerTool-Workspace.iso.sha256",
-            "artifacts\CigerTool-Workspace.release.json",
-            "artifacts\CigerTool-Workspace-debug.zip"
+          @echo off
+          if not exist "artifacts\CigerTool-Workspace.iso" (
+            echo Release artifact eksik: artifacts\CigerTool-Workspace.iso
+            exit /b 1
           )
-          foreach ($path in $requiredPaths) {
-            if (-not (Test-Path -LiteralPath $path)) {
-              throw "Release artifact eksik: $path"
-            }
-          }
-          Get-Item "artifacts\CigerTool-Workspace.iso" | Format-List Name,Length,LastWriteTime
+          if not exist "artifacts\CigerTool-Workspace.iso.sha256" (
+            echo Release artifact eksik: artifacts\CigerTool-Workspace.iso.sha256
+            exit /b 1
+          )
+          if not exist "artifacts\CigerTool-Workspace.release.json" (
+            echo Release artifact eksik: artifacts\CigerTool-Workspace.release.json
+            exit /b 1
+          )
+          if not exist "artifacts\CigerTool-Workspace-debug.zip" (
+            echo Release artifact eksik: artifacts\CigerTool-Workspace-debug.zip
+            exit /b 1
+          )
+          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "Get-Item -LiteralPath 'artifacts\CigerTool-Workspace.iso' | Format-List Name,Length,LastWriteTime"
 
       - name: Upload release ISO
         uses: actions/upload-artifact@v4
         with:
           name: CigerTool-Workspace
           path: |
-            ${{ steps.local_repo.outputs.repo_root }}\artifacts\CigerTool-Workspace.iso
-            ${{ steps.local_repo.outputs.repo_root }}\artifacts\CigerTool-Workspace.iso.sha256
-            ${{ steps.local_repo.outputs.repo_root }}\artifacts\CigerTool-Workspace.release.json
-            ${{ steps.local_repo.outputs.repo_root }}\artifacts\CigerTool-Workspace-debug.zip
+            ${{ env.SELF_HOSTED_REPO_ROOT }}\artifacts\CigerTool-Workspace.iso
+            ${{ env.SELF_HOSTED_REPO_ROOT }}\artifacts\CigerTool-Workspace.iso.sha256
+            ${{ env.SELF_HOSTED_REPO_ROOT }}\artifacts\CigerTool-Workspace.release.json
+            ${{ env.SELF_HOSTED_REPO_ROOT }}\artifacts\CigerTool-Workspace-debug.zip
           if-no-files-found: error
           retention-days: 30
 
@@ -203,6 +213,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cigertool-build-logs
-          path: ${{ steps.local_repo.outputs.repo_root }}\artifacts\logs
+          path: ${{ env.SELF_HOSTED_REPO_ROOT }}\artifacts\logs
           if-no-files-found: warn
           retention-days: 30

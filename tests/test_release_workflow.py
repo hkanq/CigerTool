@@ -18,6 +18,8 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("Validate local Python", workflow)
         self.assertIn("git clone", workflow)
         self.assertIn("GITHUB_TOKEN: ${{ github.token }}", workflow)
+        self.assertIn("shell: cmd", workflow)
+        self.assertIn("powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File", workflow)
         self.assertIn("inputs.build_mode == 'release'", workflow)
 
         self.assertNotIn("workspace_wim_url", workflow)
