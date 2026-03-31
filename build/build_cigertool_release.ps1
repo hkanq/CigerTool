@@ -188,6 +188,7 @@ function Assert-PlanInputsAndOutputs {
         @{ path = (Join-Path $OutputRoot "usb-layout\CigerTool.workspace.json"); description = "Workspace marker" }
         @{ path = (Join-Path $OutputRoot "usb-layout\EFI\CigerTool\grub.cfg"); description = "Workspace GRUB config" }
         @{ path = (Join-Path $OutputRoot "usb-layout\EFI\CigerTool\boot-manifest.json"); description = "Boot manifest" }
+        @{ path = (Join-Path $OutputRoot "usb-layout\EFI\Boot\bootx64.efi"); description = "UEFI boot image" }
         @{ path = (Join-Path $OutputRoot "workspace-stage\Program Files\CigerToolWorkspace\startup\Start-CigerToolWorkspace.ps1"); description = "Staged startup hook" }
         @{ path = (Join-Path $OutputRoot "workspace-stage\Program Files\CigerTool\CigerTool.exe"); description = "Staged CigerTool executable" }
         @{ path = (Join-Path $OutputRoot "usb-layout\isos\windows"); description = "ISO Library windows root" }
@@ -385,6 +386,20 @@ public static class CigerToolComStreamSaver {
     $fsi.StageFiles = $false
     $fsi.UseRestrictedCharacterSet = $false
 
+    $bootImagePath = Join-Path $SourceDirectory "EFI\Boot\bootx64.efi"
+    Assert-Path -PathValue $bootImagePath -Description "UEFI boot image"
+
+    $bootImageStream = New-Object -ComObject ADODB.Stream
+    $bootImageStream.Type = 1
+    $bootImageStream.Open()
+    $bootImageStream.LoadFromFile($bootImagePath)
+
+    $bootOptions = New-Object -ComObject IMAPI2FS.BootOptions
+    $bootOptions.AssignBootImage($bootImageStream)
+    $bootOptions.PlatformId = 0xEF
+    $bootOptions.Manufacturer = "CigerTool"
+    $fsi.BootImageOptions = $bootOptions
+
     $sourceBytes = Get-DirectorySizeBytes -PathValue $SourceDirectory
     $headroomBytes = [UInt64]([Math]::Max([double](512MB), [double][Math]::Ceiling($sourceBytes * 0.05)))
     $requiredBlocks = [UInt64][Math]::Ceiling(($sourceBytes + $headroomBytes) / 2048.0)
@@ -395,10 +410,20 @@ public static class CigerToolComStreamSaver {
     $sourceGb = [Math]::Round($sourceBytes / 1GB, 2)
     $headroomGb = [Math]::Round($headroomBytes / 1GB, 2)
     Write-ReleaseLog "ISO kapasitesi kaynak boyutuna gore ayarlandi | kaynak=$sourceGb GB | headroom=$headroomGb GB | free_media_blocks=$requiredBlocks"
+    Write-ReleaseLog "ISO UEFI boot image olarak kullaniliyor: $bootImagePath"
 
-    $fsi.Root.AddTree($SourceDirectory, $false)
-    $result = $fsi.CreateResultImage()
-    [CigerToolComStreamSaver]::SaveToFile($result.ImageStream, $DestinationPath)
+    try {
+        $fsi.Root.AddTree($SourceDirectory, $false)
+        $result = $fsi.CreateResultImage()
+        [CigerToolComStreamSaver]::SaveToFile($result.ImageStream, $DestinationPath)
+    }
+    finally {
+        try {
+            $bootImageStream.Close()
+        }
+        catch {
+        }
+    }
     Write-ReleaseLog "ISO artifact olusturuldu: $DestinationPath"
 }
 
@@ -489,7 +514,7 @@ $releaseManifest = [ordered]@{
         path = $primaryArtifactPath
         type = "iso"
         packaging_strategy = "writable-usb-distribution-iso"
-        writing_model = "USB'ye ISO/extract mode ile yazilir; sonrasinda /isos/* dizinleri kullanici tarafinda yazilabilir kalir."
+        writing_model = "USB'ye Rufus veya benzeri araclarla yazdirilabilir UEFI bootable ISO; sonrasinda /isos/* dizinleri kullanici tarafinda yazilabilir kalir."
     }
     secondary_artifacts = @(
         [ordered]@{
