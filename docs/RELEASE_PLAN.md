@@ -1,26 +1,44 @@
 # Release Plan
 
-## Ana Build Girişi
+## Ana Build Girisi
 
 - `build/build_cigertool_release.ps1`
 
 Bu script tek resmi build entrypoint'idir.
 
-## Build Modları
+## Build Modlari
 
-Plan doğrulama:
+Plan dogrulama:
 
 - `build/build_cigertool_release.ps1 -PlanOnly`
 
-Gerçek artifact üretimi:
+Gercek artifact uretimi:
 
 - `build/build_cigertool_release.ps1`
 
-## GitHub Actions Modları
+## Release Medya Modeli
+
+- Standart Windows ISO yapisi kullanilir
+- Ana OS imaji: `sources/install.wim`
+- Boot ortami: `sources/boot.wim`
+- Medya: BIOS + UEFI hibrit El Torito
+- Cikti: `artifacts/CigerTool.iso`
+- Yazdirma modeli: Rufus ile dogrudan USB'ye yazdirilabilir
+
+## Davranis Hedefi
+
+- Windows Setup ekrani gosterilmez
+- OOBE gosterilmez
+- `CigerTool` kullanicisi ile otomatik oturum acilir
+- Dil `tr-TR`
+- Masaustu dogrudan acilir
+- `CigerTool` otomatik baslar
+
+## GitHub Actions Modlari
 
 Push validation:
 
-- `push` -> sadece plan/staging doğrulama
+- `push` -> sadece plan/staging dogrulama
 - artifact: `cigertool-release-plan`
 - runner: `windows-2025`
 
@@ -29,63 +47,41 @@ Manual release:
 - `workflow_dispatch`
 - `build_mode=release`
 - runner tipi: `self-hosted`, `Windows`, `X64`
-- kalıcı yerel repo kökü: `C:\actions-runner\cigertool-release\repo`
+- kalici yerel repo koku: `C:\actions-runner\cigertool-release\repo`
 - beklenen yerel girdi: `C:\actions-runner\cigertool-release\repo\inputs\workspace\install.wim`
-
-Release modu URL indirme kullanmaz. `workspace_wim_url` yoktur. Workflow, self-hosted runner üzerindeki kalıcı repo kopyasını günceller ve yalnızca yerel `install.wim` dosyasını kullanır.
 
 ## Artifact'ler
 
 Birincil artifact:
 
-- `artifacts/CigerTool-Workspace.iso`
+- `artifacts/CigerTool.iso`
 
-GitHub Actions artifact adı:
+Ikincil artifact'ler:
 
-- `CigerTool-Workspace`
+- `artifacts/CigerTool.iso.sha256`
+- `artifacts/CigerTool-debug.zip`
+- `artifacts/CigerTool.release.json`
 
-İkincil artifact'ler:
+## Manuel Release Proseduru
 
-- `artifacts/CigerTool-Workspace.iso.sha256`
-- `artifacts/CigerTool-Workspace-debug.zip`
-- `artifacts/CigerTool-Workspace.release.json`
-
-## Manuel Release Prosedürü
-
-1. Self-hosted Windows runner makinesinde kalıcı repo kökünü hazırla:
+1. Self-hosted Windows runner makinesinde kalici repo kokunu hazirla:
    `C:\actions-runner\cigertool-release\repo`
-2. Aynı klasörde şu yolu oluştur:
+2. Ayni klasorde su yolu olustur:
    `C:\actions-runner\cigertool-release\repo\inputs\workspace`
-3. `install.wim` dosyasını şu tam yola koy:
+3. `install.wim` dosyasini su tam yola koy:
    `C:\actions-runner\cigertool-release\repo\inputs\workspace\install.wim`
-4. Self-hosted runner makinesinde Python 3.12+ kurulu ve `python` PATH içinde olsun.
-5. Self-hosted runner servisi yerel administrator haklarıyla çalışsın.
-   `NT AUTHORITY\NETWORK SERVICE` veya benzeri sınırlı servis hesapları gerçek ISO build için yeterli değildir.
-   Gerekirse runner servisini administrator hesabıyla yeniden yapılandırın veya `run.cmd` dosyasını yükseltilmiş terminalde başlatın.
-6. GitHub Actions içinde `Build CigerTool Release` workflow'unu çalıştır.
-7. `build_mode=release` seç.
-8. Workflow tamamlandığında `CigerTool-Workspace` artifact'ini indir.
-9. Artifact içinden `CigerTool-Workspace.iso` dosyasını al.
+4. Self-hosted runner makinesinde Python 3.12+ kurulu ve `python` PATH icinde olsun.
+5. Self-hosted runner servisi yerel administrator haklariyla calissin.
+6. GitHub Actions icinde `Build CigerTool Release` workflow'unu calistir.
+7. `build_mode=release` sec.
+8. Workflow tamamlandiginda `CigerTool` artifact'ini indir.
+9. Artifact icinden `CigerTool.iso` dosyasini al.
 
-## Dağıtım Modeli
+## Uretim Ozeti
 
-Birincil artifact dağıtıma uygun bir USB boot ISO'sudur.
-
-- Kullanıcı ISO'yu USB'ye ISO/extract mode ile yazar
-- USB yazıldıktan sonra `/isos/windows`, `/isos/linux` ve `/isos/tools` dizinleri kullanıcı tarafında doldurulabilir
-- Workspace ve ISO Library aynı USB üzerinden kullanılır
-
-## Startup Hook
-
-Workspace oturumu içinde otomatik başlatma hook'u:
-
-- `workspace/startup/Start-CigerToolWorkspace.ps1`
-
-## Üretim Özeti
-
-1. yerel `install.wim` doğrulanır
+1. yerel `install.wim` dogrulanir
 2. uygulama paketlenir
-3. workspace VHDX hazırlanır
-4. boot katmanı üretilir
-5. USB layout staging tamamlanır
-6. `CigerTool-Workspace.iso` oluşturulur
+3. `install.wim` offline servis edilir ve maksimum sikistirma ile tekrar uretilir
+4. `boot.wim` auto-deploy mantigi ile ozellestirilir
+5. standart BIOS + UEFI medya agaci hazirlanir
+6. `CigerTool.iso` hibrit olarak uretilir

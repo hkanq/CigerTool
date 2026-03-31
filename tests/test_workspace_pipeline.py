@@ -64,15 +64,15 @@ class WorkspacePipelineTests(unittest.TestCase):
         self.assertNotIn("Mount-DiskImage", script)
         self.assertNotIn("Resolve-WindowsInstallImage", script)
 
-    def test_release_build_script_creates_uefi_bootable_iso(self) -> None:
+    def test_release_build_script_creates_hybrid_rufus_iso(self) -> None:
         project_root = Path(__file__).resolve().parents[1]
         script = (project_root / "build" / "build_cigertool_release.ps1").read_text(encoding="utf-8")
 
-        self.assertIn("EFI\\Boot\\bootx64.efi", script)
-        self.assertIn("IMAPI2FS.BootOptions", script)
-        self.assertIn("AssignBootImage", script)
-        self.assertIn("PlatformId = 0xEF", script)
-        self.assertIn("BootImageOptions", script)
+        self.assertIn("create_hybrid_iso.py", script)
+        self.assertIn("boot\\etfsboot.com", script)
+        self.assertIn("efi\\microsoft\\boot\\efisys.bin", script)
+        self.assertIn("sources\\boot.wim", script)
+        self.assertIn("sources\\install.wim", script)
         self.assertIn("Rufus", script)
 
     def test_workspace_startup_exports_runtime_contract(self) -> None:

@@ -3,9 +3,9 @@ param(
     [string]$OutputRoot = "build-output\workspace",
     [string]$ArtifactRoot = "artifacts",
     [string]$AppBuildRoot = "build-output\app\dist\CigerTool",
-    [string]$IsoLibraryRoot = "iso-library",
-    [string]$PrimaryArtifactName = "CigerTool-Workspace.iso",
-    [string]$DebugArtifactName = "CigerTool-Workspace-debug.zip",
+    [string]$PrimaryArtifactName = "CigerTool.iso",
+    [string]$DebugArtifactName = "CigerTool-debug.zip",
+    [string]$BootWimPath = "",
     [switch]$PlanOnly,
     [switch]$SkipTests
 )
@@ -136,116 +136,68 @@ function Ensure-AppBuild {
     Assert-Path -PathValue $appExe -Description "Paketlenmis CigerTool uygulamasi"
 }
 
-function Get-WorkspaceSection {
-    param([Parameter(Mandatory = $true)][string]$GrubContent)
+function Assert-NoDiskImages {
+    param([Parameter(Mandatory = $true)][string]$RootPath)
 
-    $isoMarker = 'submenu "ISO Library"'
-    $index = $GrubContent.IndexOf($isoMarker)
-    if ($index -lt 0) {
-        return $GrubContent
-    }
-
-    return $GrubContent.Substring(0, $index)
-}
-
-function Assert-NoSetupFlowInWorkspace {
-    param([Parameter(Mandatory = $true)][string]$GrubCfgPath)
-
-    $content = Get-Content -LiteralPath $GrubCfgPath -Raw -Encoding utf8
-    $workspaceSection = Get-WorkspaceSection -GrubContent $content
-
-    foreach ($blockedToken in @("boot.wim", "setup.exe", "Windows Setup")) {
-        if ($workspaceSection -match [regex]::Escape($blockedToken)) {
-            throw "Workspace girisinde yasakli setup akisi izi bulundu: $blockedToken"
-        }
-    }
-
-    foreach ($requiredToken in @(
-        'menuentry "CigerTool Workspace"',
-        'chainloader /EFI/Microsoft/Boot/bootmgfw.efi',
-        '/EFI/Microsoft/Boot/BCD',
-        '/workspace/CigerToolWorkspace.vhdx'
-    )) {
-        if ($workspaceSection -notmatch [regex]::Escape($requiredToken)) {
-            throw "Workspace girisinde beklenen token bulunamadi: $requiredToken"
-        }
+    $diskImages = @(Get-ChildItem -LiteralPath $RootPath -Recurse -File -ErrorAction SilentlyContinue | Where-Object {
+        $_.Extension -in @(".vhd", ".vhdx")
+    })
+    if ($diskImages.Count -gt 0) {
+        throw "Release layout icinde VHD/VHDX bulunmamali: $($diskImages[0].FullName)"
     }
 }
 
 function Assert-PlanInputsAndOutputs {
     param(
         [Parameter(Mandatory = $true)][string]$ProjectRoot,
-        [Parameter(Mandatory = $true)][string]$WorkspaceWimSource,
+        [Parameter(Mandatory = $true)][string]$InstallWimSource,
         [Parameter(Mandatory = $true)][string]$OutputRoot
     )
 
-    $requiredPaths = @(
-        @{ path = $WorkspaceWimSource; description = "Workspace source WIM" }
-        @{ path = (Join-Path $ProjectRoot "workspace\startup\Start-CigerToolWorkspace.ps1"); description = "Workspace startup hook" }
-        @{ path = (Join-Path $ProjectRoot "workspace\startup\CigerToolWorkspace.Runtime.ps1"); description = "Workspace runtime helper" }
-        @{ path = (Join-Path $OutputRoot "manifests\workspace-plan.json"); description = "Workspace plan manifest" }
-        @{ path = (Join-Path $OutputRoot "manifests\CigerToolWorkspace.Unattend.xml"); description = "Workspace unattend manifest" }
-        @{ path = (Join-Path $OutputRoot "usb-layout\CigerTool.workspace.json"); description = "Workspace marker" }
-        @{ path = (Join-Path $OutputRoot "usb-layout\EFI\CigerTool\grub.cfg"); description = "Workspace GRUB config" }
-        @{ path = (Join-Path $OutputRoot "usb-layout\EFI\CigerTool\boot-manifest.json"); description = "Boot manifest" }
-        @{ path = (Join-Path $OutputRoot "usb-layout\EFI\Boot\bootx64.efi"); description = "UEFI boot image" }
-        @{ path = (Join-Path $OutputRoot "workspace-stage\Program Files\CigerToolWorkspace\startup\Start-CigerToolWorkspace.ps1"); description = "Staged startup hook" }
-        @{ path = (Join-Path $OutputRoot "workspace-stage\Program Files\CigerTool\CigerTool.exe"); description = "Staged CigerTool executable" }
-        @{ path = (Join-Path $OutputRoot "usb-layout\isos\windows"); description = "ISO Library windows root" }
-        @{ path = (Join-Path $OutputRoot "usb-layout\isos\linux"); description = "ISO Library linux root" }
-        @{ path = (Join-Path $OutputRoot "usb-layout\isos\tools"); description = "ISO Library tools root" }
-    )
-
-    foreach ($entry in $requiredPaths) {
+    foreach ($entry in @(
+        @{ path = $InstallWimSource; description = "Install WIM source" }
+        @{ path = (Join-Path $ProjectRoot "workspace\startup\Start-CigerToolWorkspace.ps1"); description = "Startup hook" }
+        @{ path = (Join-Path $OutputRoot "manifests\release-plan.json"); description = "Release plan manifest" }
+        @{ path = (Join-Path $OutputRoot "manifests\CigerTool.Unattend.xml"); description = "Unattend manifest copy" }
+        @{ path = (Join-Path $OutputRoot "manifests\startup\Start-CigerToolWorkspace.ps1"); description = "Startup manifest asset" }
+        @{ path = (Join-Path $OutputRoot "media-root\bootmgr"); description = "Root bootmgr" }
+        @{ path = (Join-Path $OutputRoot "media-root\boot\BCD"); description = "BIOS BCD" }
+        @{ path = (Join-Path $OutputRoot "media-root\boot\boot.sdi"); description = "boot.sdi" }
+        @{ path = (Join-Path $OutputRoot "media-root\boot\etfsboot.com"); description = "BIOS boot image" }
+        @{ path = (Join-Path $OutputRoot "media-root\efi\boot\bootx64.efi"); description = "UEFI bootx64" }
+        @{ path = (Join-Path $OutputRoot "media-root\efi\microsoft\boot\BCD"); description = "UEFI BCD" }
+        @{ path = (Join-Path $OutputRoot "media-root\efi\microsoft\boot\efisys.bin"); description = "UEFI boot image" }
+        @{ path = (Join-Path $OutputRoot "media-root\sources"); description = "sources directory" }
+    )) {
         Assert-Path -PathValue $entry.path -Description $entry.description
     }
 
-    Assert-NoSetupFlowInWorkspace -GrubCfgPath (Join-Path $OutputRoot "usb-layout\EFI\CigerTool\grub.cfg")
+    Assert-NoDiskImages -RootPath $OutputRoot
 }
 
 function Assert-ReleaseInputsAndOutputs {
     param(
         [Parameter(Mandatory = $true)][string]$ProjectRoot,
-        [Parameter(Mandatory = $true)][string]$WorkspaceWimSource,
+        [Parameter(Mandatory = $true)][string]$InstallWimSource,
         [Parameter(Mandatory = $true)][string]$OutputRoot
     )
 
-    Assert-PlanInputsAndOutputs -ProjectRoot $ProjectRoot -WorkspaceWimSource $WorkspaceWimSource -OutputRoot $OutputRoot
+    Assert-PlanInputsAndOutputs -ProjectRoot $ProjectRoot -InstallWimSource $InstallWimSource -OutputRoot $OutputRoot
 
     foreach ($entry in @(
-        @{ path = (Join-Path $OutputRoot "usb-layout\EFI\Microsoft\Boot\bootmgfw.efi"); description = "Workspace boot loader" }
-        @{ path = (Join-Path $OutputRoot "usb-layout\EFI\Microsoft\Boot\BCD"); description = "Workspace BCD" }
-        @{ path = (Join-Path $OutputRoot "usb-layout\workspace\CigerToolWorkspace.vhdx"); description = "Workspace VHDX" }
+        @{ path = (Join-Path $OutputRoot "media-root\sources\boot.wim"); description = "boot.wim" }
+        @{ path = (Join-Path $OutputRoot "media-root\sources\install.wim"); description = "install.wim" }
     )) {
         Assert-Path -PathValue $entry.path -Description $entry.description
-    }
-
-    $bootManifest = Get-Content -LiteralPath (Join-Path $OutputRoot "usb-layout\EFI\CigerTool\boot-manifest.json") -Raw -Encoding utf8 | ConvertFrom-Json
-    if (-not $bootManifest.workspace.loader_present) {
-        throw "Workspace loader boot-manifest icinde mevcut degil."
-    }
-    if (-not $bootManifest.workspace.bcd_present) {
-        throw "Workspace BCD boot-manifest icinde mevcut degil."
-    }
-    if (-not $bootManifest.workspace.vhd_present) {
-        throw "Workspace VHDX boot-manifest icinde mevcut degil."
-    }
-    if (-not $bootManifest.workspace.marker_present) {
-        throw "Workspace marker boot-manifest icinde mevcut degil."
-    }
-    if (-not $bootManifest.iso_library.windows_present -or -not $bootManifest.iso_library.linux_present -or -not $bootManifest.iso_library.tools_present) {
-        throw "ISO Library koklerinden biri boot-manifest icinde eksik."
     }
 }
 
 function Assert-LockedWorkspaceDefaults {
-    param(
-        [Parameter(Mandatory = $true)][string]$ProjectRoot
-    )
+    param([Parameter(Mandatory = $true)][string]$ProjectRoot)
 
     $unattendPath = Join-Path $ProjectRoot "workspace\unattend\CigerToolWorkspace.Unattend.xml"
     $startupPath = Join-Path $ProjectRoot "workspace\startup\Start-CigerToolWorkspace.ps1"
-    $prepareScriptPath = Join-Path $ProjectRoot "build\internal\prepare_workspace_runtime.ps1"
+    $prepareScriptPath = Join-Path $ProjectRoot "build\internal\prepare_standard_release_media.ps1"
 
     $unattendContent = Get-Content -LiteralPath $unattendPath -Raw -Encoding utf8
     $startupContent = Get-Content -LiteralPath $startupPath -Raw -Encoding utf8
@@ -262,7 +214,7 @@ function Assert-LockedWorkspaceDefaults {
         "<HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>"
     )) {
         if ($unattendContent -notmatch [regex]::Escape($requiredToken)) {
-            throw "Locked workspace default dogrulamasi basarisiz. Eksik unattend token: $requiredToken"
+            throw "Locked release default dogrulamasi basarisiz. Eksik unattend token: $requiredToken"
         }
     }
 
@@ -270,28 +222,27 @@ function Assert-LockedWorkspaceDefaults {
         "AutoAdminLogon",
         "DefaultUserName",
         "DefaultPassword",
-        "New-ItemProperty",
         "ForceAutoLogon",
         "AutoLogonCount",
-        "PortableOperatingSystem",
-        "Start-CigerToolWorkspace.ps1",
-        "Set-AllIntl:tr-TR",
-        'Set-TimeZone:"Turkey Standard Time"'
+        "startnet.cmd",
+        "Apply-CigerToolImage.cmd",
+        "dism.exe /Apply-Image",
+        "bcdboot W:\Windows",
+        "create partition efi size=100",
+        "%MEDIA_ROOT%\sources\install.wim"
     )) {
         if ($prepareScriptContent -notmatch [regex]::Escape($requiredToken)) {
-            throw "Locked workspace default dogrulamasi basarisiz. Eksik prepare token: $requiredToken"
+            throw "Locked release default dogrulamasi basarisiz. Eksik prepare token: $requiredToken"
         }
     }
 
     foreach ($requiredToken in @(
         "CIGERTOOL_RUNTIME",
-        "CIGERTOOL_TOOLS_ROOT",
-        "CIGERTOOL_ISOS_ROOT",
         "workspace-startup.log",
         "CigerTool otomatik baslatildi"
     )) {
         if ($startupContent -notmatch [regex]::Escape($requiredToken)) {
-            throw "Locked workspace default dogrulamasi basarisiz. Eksik startup token: $requiredToken"
+            throw "Locked release default dogrulamasi basarisiz. Eksik startup token: $requiredToken"
         }
     }
 }
@@ -307,8 +258,6 @@ function New-DebugZip {
     $stagingRoot = Join-Path $env:TEMP ("cigertool-release-debug-" + [guid]::NewGuid().ToString("N"))
     $logsRoot = Join-Path $ProjectRoot "artifacts\logs"
     $manifestsRoot = Join-Path $OutputRoot "manifests"
-    $bootManifest = Join-Path $OutputRoot "usb-layout\EFI\CigerTool\boot-manifest.json"
-    $workspaceMarker = Join-Path $OutputRoot "usb-layout\CigerTool.workspace.json"
 
     Ensure-Directory -PathValue $stagingRoot
     try {
@@ -318,12 +267,10 @@ function New-DebugZip {
             }
         }
 
-        foreach ($file in @($bootManifest, $workspaceMarker, $ReleaseManifestPath)) {
-            if (Test-Path -LiteralPath $file) {
-                $targetDir = Join-Path $stagingRoot "release"
-                Ensure-Directory -PathValue $targetDir
-                Copy-Item -LiteralPath $file -Destination $targetDir -Force
-            }
+        if (Test-Path -LiteralPath $ReleaseManifestPath) {
+            $targetDir = Join-Path $stagingRoot "release"
+            Ensure-Directory -PathValue $targetDir
+            Copy-Item -LiteralPath $ReleaseManifestPath -Destination $targetDir -Force
         }
 
         if (Test-Path -LiteralPath $ArtifactPath) {
@@ -348,83 +295,27 @@ function New-IsoFromDirectory {
         Remove-Item -LiteralPath $DestinationPath -Force
     }
 
-    Add-Type @'
-using System;
-using System.IO;
-using System.Runtime.InteropServices;
-using System.Runtime.InteropServices.ComTypes;
+    foreach ($required in @(
+        (Join-Path $SourceDirectory "boot\etfsboot.com"),
+        (Join-Path $SourceDirectory "efi\microsoft\boot\efisys.bin"),
+        (Join-Path $SourceDirectory "sources\boot.wim"),
+        (Join-Path $SourceDirectory "sources\install.wim")
+    )) {
+        Assert-Path -PathValue $required -Description "Hybrid ISO girdi dosyasi"
+    }
 
-public static class CigerToolComStreamSaver {
-    public static void SaveToFile(object comObject, string path) {
-        var stream = (IStream)comObject;
-        using (var output = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None)) {
-            var buffer = new byte[64 * 1024];
-            var readPtr = Marshal.AllocCoTaskMem(sizeof(int));
-            try {
-                while (true) {
-                    Marshal.WriteInt32(readPtr, 0);
-                    stream.Read(buffer, buffer.Length, readPtr);
-                    int read = Marshal.ReadInt32(readPtr);
-                    if (read <= 0) {
-                        break;
-                    }
-                    output.Write(buffer, 0, read);
-                }
-            }
-            finally {
-                Marshal.FreeCoTaskMem(readPtr);
-            }
+    $isoScript = Join-Path $projectRoot "build\internal\create_hybrid_iso.py"
+    $output = & python $isoScript --source $SourceDirectory --output $DestinationPath --volume-name $VolumeName 2>&1 | ForEach-Object { $_.ToString() }
+    foreach ($line in $output) {
+        if (-not [string]::IsNullOrWhiteSpace($line)) {
+            Write-ReleaseLog "ISO writer: $line"
         }
     }
-}
-'@ -ErrorAction SilentlyContinue
-
-    $fsi = New-Object -ComObject IMAPI2FS.MsftFileSystemImage
-    $fsi.FileSystemsToCreate = 4
-    $fsi.UDFRevision = 0x0250
-    $fsi.VolumeName = $VolumeName
-    $fsi.StageFiles = $false
-    $fsi.UseRestrictedCharacterSet = $false
-
-    $bootImagePath = Join-Path $SourceDirectory "EFI\Boot\bootx64.efi"
-    Assert-Path -PathValue $bootImagePath -Description "UEFI boot image"
-
-    $bootImageStream = New-Object -ComObject ADODB.Stream
-    $bootImageStream.Type = 1
-    $bootImageStream.Open()
-    $bootImageStream.LoadFromFile($bootImagePath)
-
-    $bootOptions = New-Object -ComObject IMAPI2FS.BootOptions
-    $bootOptions.AssignBootImage($bootImageStream)
-    $bootOptions.PlatformId = 0xEF
-    $bootOptions.Manufacturer = "CigerTool"
-    $fsi.BootImageOptions = $bootOptions
-
-    $sourceBytes = Get-DirectorySizeBytes -PathValue $SourceDirectory
-    $headroomBytes = [UInt64]([Math]::Max([double](512MB), [double][Math]::Ceiling($sourceBytes * 0.05)))
-    $requiredBlocks = [UInt64][Math]::Ceiling(($sourceBytes + $headroomBytes) / 2048.0)
-    if ($requiredBlocks -gt [UInt64][int]::MaxValue) {
-        throw "ISO kapasitesi Int32 block sinirini asiyor. kaynak=$SourceDirectory | boyut=$sourceBytes byte"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Hybrid ISO olusturma basarisiz oldu."
     }
-    $fsi.FreeMediaBlocks = [int]$requiredBlocks
-    $sourceGb = [Math]::Round($sourceBytes / 1GB, 2)
-    $headroomGb = [Math]::Round($headroomBytes / 1GB, 2)
-    Write-ReleaseLog "ISO kapasitesi kaynak boyutuna gore ayarlandi | kaynak=$sourceGb GB | headroom=$headroomGb GB | free_media_blocks=$requiredBlocks"
-    Write-ReleaseLog "ISO UEFI boot image olarak kullaniliyor: $bootImagePath"
 
-    try {
-        $fsi.Root.AddTree($SourceDirectory, $false)
-        $result = $fsi.CreateResultImage()
-        [CigerToolComStreamSaver]::SaveToFile($result.ImageStream, $DestinationPath)
-    }
-    finally {
-        try {
-            $bootImageStream.Close()
-        }
-        catch {
-        }
-    }
-    Write-ReleaseLog "ISO artifact olusturuldu: $DestinationPath"
+    Write-ReleaseLog "Hybrid BIOS + UEFI ISO artifact olusturuldu: $DestinationPath"
 }
 
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -432,12 +323,11 @@ $resolvedOutputRoot = Resolve-ProjectPath -ProjectRoot $projectRoot -PathValue $
 $resolvedArtifactRoot = Resolve-ProjectPath -ProjectRoot $projectRoot -PathValue $ArtifactRoot
 $resolvedWorkspaceWimPath = Resolve-ProjectPath -ProjectRoot $projectRoot -PathValue $WorkspaceWimPath
 $resolvedAppBuildRoot = Resolve-ProjectPath -ProjectRoot $projectRoot -PathValue $AppBuildRoot
-$resolvedIsoLibraryRoot = Resolve-ProjectPath -ProjectRoot $projectRoot -PathValue $IsoLibraryRoot
 $releaseLogRoot = Join-Path $resolvedArtifactRoot "logs"
 $primaryArtifactPath = Join-Path $resolvedArtifactRoot $PrimaryArtifactName
 $debugArtifactPath = Join-Path $resolvedArtifactRoot $DebugArtifactName
 $hashArtifactPath = $primaryArtifactPath + ".sha256"
-$releaseManifestPath = Join-Path $resolvedArtifactRoot "CigerTool-Workspace.release.json"
+$releaseManifestPath = Join-Path $resolvedArtifactRoot "CigerTool.release.json"
 
 foreach ($path in @($resolvedArtifactRoot, $releaseLogRoot)) {
     Ensure-Directory -PathValue $path
@@ -449,13 +339,12 @@ Set-Content -Path $script:LogFile -Value ""
 Write-ReleaseLog "CigerTool final artifact generation baslatiliyor."
 Write-ReleaseLog "Ana build girisi: build\\build_cigertool_release.ps1"
 
-Assert-Path -PathValue $resolvedWorkspaceWimPath -Description "Hazir workspace WIM girdisi (beklenen yol: inputs\\workspace\\install.wim)"
-Assert-Path -PathValue $resolvedIsoLibraryRoot -Description "ISO Library kaynak klasoru"
+Assert-Path -PathValue $resolvedWorkspaceWimPath -Description "Hazir install.wim girdisi (beklenen yol: inputs\\workspace\\install.wim)"
 Assert-LockedWorkspaceDefaults -ProjectRoot $projectRoot
 
 if ((-not $PlanOnly) -and (-not (Test-IsAdministrator))) {
     $identityName = Get-CurrentIdentityName
-    throw "Final artifact generation elevasyon gerektirir. Mevcut Windows kimligi: $identityName. Bu build, VHDX hazirlama icin diskpart ve DISM kullaniyor. Self-hosted runner servisini yerel administrator hesabi ile calistirin veya runner'i yukseltilmis bir terminalden run.cmd ile baslatin."
+    throw "Final artifact generation elevasyon gerektirir. Mevcut Windows kimligi: $identityName. Bu build, WIM mount ve DISM tabanli image servis islemleri yaptigi icin administrator haklari gerektirir."
 }
 
 if (-not $SkipTests) {
@@ -471,7 +360,11 @@ Ensure-AppBuild -ProjectRoot $projectRoot -AppBuildRoot $resolvedAppBuildRoot
 foreach ($generatedPath in @(
     (Join-Path $resolvedOutputRoot "workspace"),
     (Join-Path $resolvedOutputRoot "workspace-stage"),
-    (Join-Path $resolvedOutputRoot "usb-layout")
+    (Join-Path $resolvedOutputRoot "usb-layout"),
+    (Join-Path $resolvedOutputRoot "media-root"),
+    (Join-Path $resolvedOutputRoot "mount"),
+    (Join-Path $resolvedOutputRoot "work"),
+    (Join-Path $resolvedOutputRoot "manifests")
 )) {
     Remove-GeneratedPath -PathValue $generatedPath -AllowedRoot $resolvedOutputRoot
 }
@@ -486,35 +379,43 @@ foreach ($artifactPath in @($primaryArtifactPath, $debugArtifactPath, $hashArtif
     -WorkspaceWimPath $resolvedWorkspaceWimPath `
     -OutputRoot $resolvedOutputRoot `
     -AppBuildRoot $resolvedAppBuildRoot `
-    -IsoLibraryRoot $resolvedIsoLibraryRoot `
+    -BootWimPath $BootWimPath `
     -PlanOnly:$PlanOnly
 
 if ($PlanOnly) {
-    Assert-PlanInputsAndOutputs -ProjectRoot $projectRoot -WorkspaceWimSource $resolvedWorkspaceWimPath -OutputRoot $resolvedOutputRoot
+    Assert-PlanInputsAndOutputs -ProjectRoot $projectRoot -InstallWimSource $resolvedWorkspaceWimPath -OutputRoot $resolvedOutputRoot
     Write-ReleaseLog "PlanOnly modu tamamlandi. Gercek artifact uretimi atlandi."
     return
 }
 
-Assert-ReleaseInputsAndOutputs -ProjectRoot $projectRoot -WorkspaceWimSource $resolvedWorkspaceWimPath -OutputRoot $resolvedOutputRoot
+Assert-ReleaseInputsAndOutputs -ProjectRoot $projectRoot -InstallWimSource $resolvedWorkspaceWimPath -OutputRoot $resolvedOutputRoot
 
-$usbLayoutRoot = Join-Path $resolvedOutputRoot "usb-layout"
-New-IsoFromDirectory -SourceDirectory $usbLayoutRoot -DestinationPath $primaryArtifactPath -VolumeName "CIGERTOOL"
+$mediaRoot = Join-Path $resolvedOutputRoot "media-root"
+New-IsoFromDirectory -SourceDirectory $mediaRoot -DestinationPath $primaryArtifactPath -VolumeName "CIGERTOOL"
 
 $hash = Get-FileHash -LiteralPath $primaryArtifactPath -Algorithm SHA256
 Set-Content -Path $hashArtifactPath -Value ($hash.Hash.ToLowerInvariant() + "  " + [System.IO.Path]::GetFileName($primaryArtifactPath)) -Encoding ascii
 Write-ReleaseLog "SHA256 hash yazildi: $hashArtifactPath"
 
+$isoItem = Get-Item -LiteralPath $primaryArtifactPath
+$isoSizeGb = [Math]::Round($isoItem.Length / 1GB, 2)
+if ($isoItem.Length -gt 3GB) {
+    throw "ISO boyutu hedefi asti. Boyut=$isoSizeGb GB | hedef en fazla 3 GB"
+}
+Write-ReleaseLog "ISO boyutu hedef dahilinde: $isoSizeGb GB"
+
 $releaseManifest = [ordered]@{
-    product = "CigerTool Workspace"
+    product = "CigerTool"
     built_at = (Get-Date).ToString("o")
-    source_workspace_wim = $resolvedWorkspaceWimPath
-    iso_library_source = $resolvedIsoLibraryRoot
+    source_install_wim = $resolvedWorkspaceWimPath
     primary_artifact = [ordered]@{
         name = [System.IO.Path]::GetFileName($primaryArtifactPath)
         path = $primaryArtifactPath
         type = "iso"
-        packaging_strategy = "writable-usb-distribution-iso"
-        writing_model = "USB'ye Rufus veya benzeri araclarla yazdirilabilir UEFI bootable ISO; sonrasinda /isos/* dizinleri kullanici tarafinda yazilabilir kalir."
+        packaging_strategy = "standard-windows-hybrid-iso"
+        rufus_compatible = $true
+        writing_model = "Rufus ile dogrudan USB'ye yazdirilabilir hibrit ISO."
+        firmware = @("bios", "uefi")
     }
     secondary_artifacts = @(
         [ordered]@{
@@ -528,21 +429,18 @@ $releaseManifest = [ordered]@{
             type = "debug-zip"
         }
     )
-    workspace = [ordered]@{
-        loader = "/EFI/Microsoft/Boot/bootmgfw.efi"
-        bcd = "/EFI/Microsoft/Boot/BCD"
-        vhd = "/workspace/CigerToolWorkspace.vhdx"
-        marker = "/CigerTool.workspace.json"
-        startup_hook = "C:\Program Files\CigerToolWorkspace\startup\Start-CigerToolWorkspace.ps1"
+    media_layout = [ordered]@{
+        bootmgr = "/bootmgr"
+        bios_bcd = "/boot/BCD"
+        uefi_bcd = "/efi/microsoft/boot/BCD"
+        boot_wim = "/sources/boot.wim"
+        install_wim = "/sources/install.wim"
     }
-    iso_library = [ordered]@{
-        windows = "/isos/windows"
-        linux = "/isos/linux"
-        tools = "/isos/tools"
-    }
-    release_readiness = [ordered]@{
-        setup_path_removed_from_workspace = $true
-        oobe_questions_expected = $false
+    runtime_defaults = [ordered]@{
+        oobe_expected = $false
+        setup_ui_expected = $false
+        autologin_user = "CigerTool"
+        language = "tr-TR"
         direct_desktop_expected = $true
         cigertool_autostart_expected = $true
     }

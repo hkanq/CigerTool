@@ -61,16 +61,17 @@ jobs:
         shell: powershell
         run: |
           $requiredPaths = @(
-            "build-output\workspace\manifests\workspace-plan.json",
-            "build-output\workspace\manifests\CigerToolWorkspace.Unattend.xml",
-            "build-output\workspace\usb-layout\CigerTool.workspace.json",
-            "build-output\workspace\usb-layout\EFI\CigerTool\grub.cfg",
-            "build-output\workspace\usb-layout\EFI\CigerTool\boot-manifest.json",
-            "build-output\workspace\workspace-stage\Program Files\CigerToolWorkspace\startup\Start-CigerToolWorkspace.ps1",
-            "build-output\workspace\workspace-stage\Program Files\CigerToolWorkspace\startup\CigerToolWorkspace.Runtime.ps1",
-            "build-output\workspace\usb-layout\isos\windows",
-            "build-output\workspace\usb-layout\isos\linux",
-            "build-output\workspace\usb-layout\isos\tools"
+            "build-output\workspace\manifests\release-plan.json",
+            "build-output\workspace\manifests\CigerTool.Unattend.xml",
+            "build-output\workspace\manifests\startup\Start-CigerToolWorkspace.ps1",
+            "build-output\workspace\media-root\bootmgr",
+            "build-output\workspace\media-root\boot\BCD",
+            "build-output\workspace\media-root\boot\boot.sdi",
+            "build-output\workspace\media-root\boot\etfsboot.com",
+            "build-output\workspace\media-root\efi\boot\bootx64.efi",
+            "build-output\workspace\media-root\efi\microsoft\boot\BCD",
+            "build-output\workspace\media-root\efi\microsoft\boot\efisys.bin",
+            "build-output\workspace\media-root\sources"
           )
           foreach ($path in $requiredPaths) {
             if (-not (Test-Path -LiteralPath $path)) {
@@ -185,33 +186,33 @@ jobs:
         working-directory: ${{ env.SELF_HOSTED_REPO_ROOT }}
         run: |
           @echo off
-          if not exist "artifacts\CigerTool-Workspace.iso" (
-            echo Release artifact eksik: artifacts\CigerTool-Workspace.iso
+          if not exist "artifacts\CigerTool.iso" (
+            echo Release artifact eksik: artifacts\CigerTool.iso
             exit /b 1
           )
-          if not exist "artifacts\CigerTool-Workspace.iso.sha256" (
-            echo Release artifact eksik: artifacts\CigerTool-Workspace.iso.sha256
+          if not exist "artifacts\CigerTool.iso.sha256" (
+            echo Release artifact eksik: artifacts\CigerTool.iso.sha256
             exit /b 1
           )
-          if not exist "artifacts\CigerTool-Workspace.release.json" (
-            echo Release artifact eksik: artifacts\CigerTool-Workspace.release.json
+          if not exist "artifacts\CigerTool.release.json" (
+            echo Release artifact eksik: artifacts\CigerTool.release.json
             exit /b 1
           )
-          if not exist "artifacts\CigerTool-Workspace-debug.zip" (
-            echo Release artifact eksik: artifacts\CigerTool-Workspace-debug.zip
+          if not exist "artifacts\CigerTool-debug.zip" (
+            echo Release artifact eksik: artifacts\CigerTool-debug.zip
             exit /b 1
           )
-          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "Get-Item -LiteralPath 'artifacts\CigerTool-Workspace.iso' | Format-List Name,Length,LastWriteTime"
+          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "Get-Item -LiteralPath 'artifacts\CigerTool.iso' | Format-List Name,Length,LastWriteTime"
 
       - name: Upload release ISO
         uses: actions/upload-artifact@v4
         with:
-          name: CigerTool-Workspace
+          name: CigerTool
           path: |
-            ${{ env.SELF_HOSTED_REPO_ROOT }}\artifacts\CigerTool-Workspace.iso
-            ${{ env.SELF_HOSTED_REPO_ROOT }}\artifacts\CigerTool-Workspace.iso.sha256
-            ${{ env.SELF_HOSTED_REPO_ROOT }}\artifacts\CigerTool-Workspace.release.json
-            ${{ env.SELF_HOSTED_REPO_ROOT }}\artifacts\CigerTool-Workspace-debug.zip
+            ${{ env.SELF_HOSTED_REPO_ROOT }}\artifacts\CigerTool.iso
+            ${{ env.SELF_HOSTED_REPO_ROOT }}\artifacts\CigerTool.iso.sha256
+            ${{ env.SELF_HOSTED_REPO_ROOT }}\artifacts\CigerTool.release.json
+            ${{ env.SELF_HOSTED_REPO_ROOT }}\artifacts\CigerTool-debug.zip
           if-no-files-found: error
           retention-days: 30
 

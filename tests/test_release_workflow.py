@@ -19,15 +19,14 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("Validate runner elevation", workflow)
         self.assertIn("git clone", workflow)
         self.assertIn('git config --global --add safe.directory "%REPO_ROOT%"', workflow)
-        self.assertIn("GITHUB_TOKEN: ${{ github.token }}", workflow)
-        self.assertIn("shell: cmd", workflow)
         self.assertIn("powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File", workflow)
-        self.assertIn("inputs.build_mode == 'release'", workflow)
+        self.assertIn("artifacts\\CigerTool.iso", workflow)
+        self.assertIn("artifacts\\CigerTool.release.json", workflow)
+        self.assertIn("name: CigerTool", workflow)
 
         self.assertNotIn("workspace_wim_url", workflow)
         self.assertNotIn("WORKSPACE_WIM_URL", workflow)
-        self.assertNotIn("Invoke-WebRequest", workflow)
-        self.assertNotIn("clean: false", workflow)
+        self.assertNotIn("CigerTool-Workspace.iso", workflow)
 
 
 if __name__ == "__main__":
