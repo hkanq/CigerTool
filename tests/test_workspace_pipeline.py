@@ -41,6 +41,7 @@ class WorkspacePipelineTests(unittest.TestCase):
         self.assertIn("Windows\\Panther\\Unattend.xml", script)
         self.assertIn("Ensure-VhdMounted", script)
         self.assertIn("Mount-VhdAndAssignDriveLetter", script)
+        self.assertIn("New-VhdAndAssignDriveLetter", script)
         self.assertIn("Assign-VhdDriveLetterWithDiskPart", script)
         self.assertIn("Resolve-VhdDiskPartPartitionNumber", script)
         self.assertIn("Normalize-DriveLetter", script)

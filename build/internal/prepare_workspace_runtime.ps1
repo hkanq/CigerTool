@@ -466,6 +466,78 @@ function Mount-VhdAndAssignDriveLetter {
     throw "$Label icin atanabilir gecici surucu harfi bulunamadi."
 }
 
+function New-VhdAndAssignDriveLetter {
+    param(
+        [Parameter(Mandatory = $true)][string]$VhdPath,
+        [Parameter(Mandatory = $true)][string[]]$PreferredLetters,
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][string[]]$DiskPartCreateLines,
+        [string[]]$ExcludedLetters = @()
+    )
+
+    $excluded = @{}
+    foreach ($item in $ExcludedLetters) {
+        if (-not [string]::IsNullOrWhiteSpace($item)) {
+            $excluded[$item.Trim().Substring(0, 1).ToUpperInvariant()] = $true
+        }
+    }
+
+    $fallbackLetters = @("Z", "Y", "X", "W", "V", "U", "T", "S", "R", "Q", "P", "O", "N", "M")
+    $triedLetters = New-Object System.Collections.Generic.HashSet[string]([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($candidate in @($PreferredLetters + $fallbackLetters)) {
+        if ([string]::IsNullOrWhiteSpace($candidate)) {
+            continue
+        }
+
+        $letter = $candidate.Trim().Substring(0, 1).ToUpperInvariant()
+        if (-not $triedLetters.Add($letter)) {
+            continue
+        }
+
+        if ($excluded.ContainsKey($letter)) {
+            continue
+        }
+
+        $driveRoot = Get-DriveRoot -DriveLetter $letter
+        if (Test-Path -LiteralPath $driveRoot) {
+            Write-BuildLog "$Label icin surucu harfi atlandi, kullanimda gorunuyor: $letter" "WARN"
+            continue
+        }
+
+        Dismount-VhdIfAttached -VhdPath $VhdPath -Label $Label
+        if (Test-Path -LiteralPath $VhdPath) {
+            Remove-Item -LiteralPath $VhdPath -Force -ErrorAction Stop
+        }
+
+        $resolvedLines = foreach ($line in $DiskPartCreateLines) {
+            $line.Replace("{{DRIVE_LETTER}}", $letter)
+        }
+
+        try {
+            Invoke-DiskPartScript -Lines $resolvedLines
+        }
+        catch {
+            Write-BuildLog "$Label icin surucu harfi atanamadi: $letter | $($_.Exception.Message)" "WARN"
+            Dismount-VhdIfAttached -VhdPath $VhdPath -Label $Label
+            continue
+        }
+
+        for ($attempt = 0; $attempt -lt 8; $attempt++) {
+            if (Test-Path -LiteralPath $driveRoot) {
+                Write-BuildLog "$Label icin gecici surucu harfi secildi: $letter"
+                return $letter
+            }
+
+            Start-Sleep -Milliseconds 250
+        }
+
+        Write-BuildLog "$Label icin surucu harfi dogrulanamadi: $letter" "WARN"
+        Dismount-VhdIfAttached -VhdPath $VhdPath -Label $Label
+    }
+
+    throw "$Label icin atanabilir gecici surucu harfi bulunamadi."
+}
+
 function Invoke-DiskPartScript {
     param([Parameter(Mandatory = $true)][string[]]$Lines)
 
@@ -848,18 +920,16 @@ try {
     Copy-WorkspacePayloadOverlay -PayloadSourceRoot $payloadSourceRoot -WorkspaceWindowsRoot $workspaceDriveRoot
     Set-WorkspaceOfflineRegistry -WorkspaceWindowsRoot $workspaceDriveRoot
 
-    $efiDriveLetter = Get-FreeDriveLetter -PreferredLetters @("S", "Y", "X", "Z", "R", "Q", "P", "O") -ExcludedLetters @($workspaceDriveLetter)
-    Invoke-DiskPartScript -Lines @(
+    $efiDriveLetter = New-VhdAndAssignDriveLetter -VhdPath $efiVhdPath -PreferredLetters @("S", "Y", "X", "Z", "R", "Q", "P", "O") -Label "EFI VHD" -ExcludedLetters @($workspaceDriveLetter) -DiskPartCreateLines @(
         "create vdisk file=""$efiVhdPath"" maximum=256 type=fixed",
         "select vdisk file=""$efiVhdPath""",
         "attach vdisk",
         "convert gpt noerr",
         "create partition efi size=128",
         "format quick fs=fat32 label=""SYSTEM""",
-        "assign letter=$efiDriveLetter"
+        "assign letter={{DRIVE_LETTER}}"
     )
     $efiDriveRoot = Get-DriveRoot -DriveLetter $efiDriveLetter
-    Write-BuildLog "EFI VHD icin gecici surucu harfi secildi: $efiDriveLetter"
 
     Ensure-VhdMounted -VhdPath $workspaceVhdPath -DriveLetter $workspaceDriveLetter -PartitionRole "BasicData" -Label "Workspace VHD"
     Ensure-VhdMounted -VhdPath $efiVhdPath -DriveLetter $efiDriveLetter -PartitionRole "EfiSystem" -Label "EFI VHD"
