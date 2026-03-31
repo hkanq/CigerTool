@@ -137,7 +137,38 @@ function Get-FreeDriveLetter {
 
 function Get-DriveRoot {
     param([Parameter(Mandatory = $true)][string]$DriveLetter)
-    return ($DriveLetter.Trim().Substring(0, 1).ToUpperInvariant() + ":\")
+
+    $normalizedLetter = Normalize-DriveLetter -DriveLetter $DriveLetter
+    if ($null -eq $normalizedLetter) {
+        throw "Gecersiz surucu harfi: $DriveLetter"
+    }
+
+    return ($normalizedLetter + ":\")
+}
+
+function Normalize-DriveLetter {
+    param([AllowNull()][object]$DriveLetter)
+
+    if ($null -eq $DriveLetter) {
+        return $null
+    }
+
+    $text = [string]$DriveLetter
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        return $null
+    }
+
+    $candidate = $text.Trim()
+    if ($candidate.Length -eq 0) {
+        return $null
+    }
+
+    $letter = $candidate.Substring(0, 1).ToUpperInvariant()
+    if ($letter -notmatch '^[A-Z]$') {
+        return $null
+    }
+
+    return $letter
 }
 
 function Get-VhdPartition {
@@ -184,12 +215,7 @@ function Get-VhdDriveLetter {
         return $null
     }
 
-    $driveLetter = [string]$partition.DriveLetter
-    if ([string]::IsNullOrWhiteSpace($driveLetter)) {
-        return $null
-    }
-
-    return $driveLetter.Trim().Substring(0, 1).ToUpperInvariant()
+    return (Normalize-DriveLetter -DriveLetter $partition.DriveLetter)
 }
 
 function Set-VhdDriveLetter {
@@ -200,7 +226,11 @@ function Set-VhdDriveLetter {
         [int]$PartitionNumber = 1
     )
 
-    $normalizedLetter = $DriveLetter.Trim().Substring(0, 1).ToUpperInvariant()
+    $normalizedLetter = Normalize-DriveLetter -DriveLetter $DriveLetter
+    if ($null -eq $normalizedLetter) {
+        throw "$Label icin gecersiz surucu harfi verildi: $DriveLetter"
+    }
+
     $partition = Get-VhdPartition -VhdPath $VhdPath -PartitionNumber $PartitionNumber
     if ($null -eq $partition) {
         throw "$Label partition bilgisi hazir degil: $VhdPath"
@@ -239,7 +269,7 @@ function Dismount-VhdIfAttached {
     try {
         $diskImage = Get-DiskImage -ImagePath $VhdPath -ErrorAction Stop
         if ($diskImage.Attached) {
-            Dismount-DiskImage -ImagePath $VhdPath -ErrorAction Stop
+            Dismount-DiskImage -ImagePath $VhdPath -ErrorAction Stop | Out-Null
             Write-BuildLog "$Label bagli disk imaji temizlendi: $VhdPath" "WARN"
         }
     }
