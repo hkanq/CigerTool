@@ -14,10 +14,6 @@ on:
         options:
           - plan
           - release
-      workspace_wim_url:
-        description: "Opsiyonel install.wim indirme URL'si"
-        required: false
-        type: string
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -26,14 +22,10 @@ permissions:
   contents: read
 
 jobs:
-  build-release:
+  validate-release-plan:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.build_mode == 'plan')
     runs-on: windows-2025
-    timeout-minutes: 120
-    env:
-      WORKFLOW_BUILD_MODE: ${{ inputs.build_mode }}
-      WORKFLOW_WIM_URL: ${{ inputs.workspace_wim_url }}
-      DEFAULT_WORKSPACE_WIM_URL: ${{ secrets.WORKSPACE_WIM_URL }}
-      WORKSPACE_WIM_AUTH_HEADER: ${{ secrets.WORKSPACE_WIM_AUTH_HEADER }}
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -44,74 +36,15 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Prepare release logs root
+      - name: Prepare plan input placeholder
         shell: powershell
         run: |
           New-Item -ItemType Directory -Force -Path "artifacts\logs" | Out-Null
-
-      - name: Resolve workspace input
-        id: workspace_input
-        shell: powershell
-        run: |
-          $mode = "plan"
-          if ($env:GITHUB_EVENT_NAME -eq "workflow_dispatch" -and -not [string]::IsNullOrWhiteSpace($env:WORKFLOW_BUILD_MODE)) {
-            $mode = $env:WORKFLOW_BUILD_MODE.Trim().ToLowerInvariant()
+          New-Item -ItemType Directory -Force -Path "inputs\workspace" | Out-Null
+          if (-not (Test-Path -LiteralPath "inputs\workspace\install.wim")) {
+            New-Item -ItemType File -Force -Path "inputs\workspace\install.wim" | Out-Null
           }
-
-          $targetDir = "inputs\workspace"
-          $targetPath = Join-Path $targetDir "install.wim"
-          $logPath = "artifacts\logs\workspace-input.log"
-          New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
-
-          $resolvedUrl = ""
-          if (-not [string]::IsNullOrWhiteSpace($env:WORKFLOW_WIM_URL)) {
-            $resolvedUrl = $env:WORKFLOW_WIM_URL.Trim()
-          } elseif (-not [string]::IsNullOrWhiteSpace($env:DEFAULT_WORKSPACE_WIM_URL)) {
-            $resolvedUrl = $env:DEFAULT_WORKSPACE_WIM_URL.Trim()
-          }
-
-          $source = ""
-          $hasRealWim = $false
-
-          if (Test-Path -LiteralPath $targetPath) {
-            $source = "repo"
-            $hasRealWim = $true
-          } elseif (-not [string]::IsNullOrWhiteSpace($resolvedUrl)) {
-            $headers = @{}
-            if (-not [string]::IsNullOrWhiteSpace($env:WORKSPACE_WIM_AUTH_HEADER)) {
-              $parts = $env:WORKSPACE_WIM_AUTH_HEADER.Split(":", 2)
-              if ($parts.Count -eq 2) {
-                $headers[$parts[0].Trim()] = $parts[1].Trim()
-              }
-            }
-
-            Write-Host "Workspace WIM indiriliyor: $resolvedUrl"
-            Invoke-WebRequest -Uri $resolvedUrl -OutFile $targetPath -Headers $headers
-            $source = "download"
-            $hasRealWim = $true
-          } elseif ($mode -eq "plan") {
-            New-Item -ItemType File -Force -Path $targetPath | Out-Null
-            $source = "placeholder"
-            $hasRealWim = $false
-          } else {
-            throw "Release build icin gereken girdi bulunamadi. Beklenen yol: inputs\\workspace\\install.wim. Alternatif olarak workflow_dispatch ile workspace_wim_url veya WORKSPACE_WIM_URL secret'i verin."
-          }
-
-          $item = Get-Item -LiteralPath $targetPath
-          @(
-            "mode=$mode"
-            "source=$source"
-            "path=$($item.FullName)"
-            "size=$($item.Length)"
-            "has_real_wim=$hasRealWim"
-          ) | Set-Content -Path $logPath -Encoding utf8
-
-          "build_mode=$mode" >> $env:GITHUB_OUTPUT
-          "workspace_source=$source" >> $env:GITHUB_OUTPUT
-          "workspace_path=$($item.FullName)" >> $env:GITHUB_OUTPUT
-          "has_real_wim=$hasRealWim" >> $env:GITHUB_OUTPUT
-
-          Get-Item $targetPath | Format-List Name,Length,LastWriteTime
+          Set-Content -Path "artifacts\logs\workspace-input.log" -Value "mode=plan`nsource=placeholder`npath=inputs\workspace\install.wim" -Encoding utf8
 
       - name: Install Python dependencies
         shell: powershell
@@ -120,19 +53,11 @@ jobs:
           python -m pip install -r requirements.txt
 
       - name: Build release plan
-        if: steps.workspace_input.outputs.build_mode == 'plan'
         shell: powershell
         run: |
           .\build\build_cigertool_release.ps1 -PlanOnly -WorkspaceWimPath "inputs\workspace\install.wim"
 
-      - name: Build release ISO
-        if: steps.workspace_input.outputs.build_mode == 'release'
-        shell: powershell
-        run: |
-          .\build\build_cigertool_release.ps1 -WorkspaceWimPath "inputs\workspace\install.wim"
-
       - name: Validate staged outputs
-        if: steps.workspace_input.outputs.build_mode == 'plan'
         shell: powershell
         run: |
           $requiredPaths = @(
@@ -153,8 +78,64 @@ jobs:
             }
           }
 
+      - name: Upload staged release plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: cigertool-release-plan
+          path: build-output/workspace
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cigertool-build-logs
+          path: artifacts/logs
+          if-no-files-found: warn
+          retention-days: 30
+
+  build-release-iso:
+    if: github.event_name == 'workflow_dispatch' && inputs.build_mode == 'release'
+    runs-on:
+      - self-hosted
+      - Windows
+      - X64
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate local workspace input
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path "artifacts\logs" | Out-Null
+          if (-not (Test-Path -LiteralPath "inputs\workspace\install.wim")) {
+            throw "Release mode icin gereken yerel girdi bulunamadi: inputs\workspace\install.wim. Manual release oncesi bu dosyayi repo working tree icine yerlestirin."
+          }
+          Get-Item "inputs\workspace\install.wim" | Format-List Name,Length,LastWriteTime
+          Set-Content -Path "artifacts\logs\workspace-input.log" -Value "mode=release`nsource=local-working-tree`npath=inputs\workspace\install.wim" -Encoding utf8
+
+      - name: Install Python dependencies
+        shell: powershell
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Build release ISO
+        shell: powershell
+        run: |
+          .\build\build_cigertool_release.ps1 -WorkspaceWimPath "inputs\workspace\install.wim"
+
       - name: Validate release artifacts
-        if: steps.workspace_input.outputs.build_mode == 'release'
         shell: powershell
         run: |
           $requiredPaths = @(
@@ -170,17 +151,7 @@ jobs:
           }
           Get-Item "artifacts\CigerTool-Workspace.iso" | Format-List Name,Length,LastWriteTime
 
-      - name: Upload staged release plan
-        if: steps.workspace_input.outputs.build_mode == 'plan'
-        uses: actions/upload-artifact@v4
-        with:
-          name: cigertool-release-plan
-          path: build-output/workspace
-          if-no-files-found: error
-          retention-days: 30
-
       - name: Upload release ISO
-        if: steps.workspace_input.outputs.build_mode == 'release'
         uses: actions/upload-artifact@v4
         with:
           name: CigerTool-Workspace

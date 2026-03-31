@@ -11,6 +11,7 @@ artifacts/
 .mypy_cache/
 *.spec
 *.wim
+inputs/workspace/install.wim
 *.vhd
 *.vhdx
 *.iso

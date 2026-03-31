@@ -3,25 +3,17 @@
 ## Durum
 
 - Tarih: 2026-03-31
-- Asama: Final repository cleanup
-- Sonuc: kok yapi final mimariye gore sadeleştirildi, legacy yollar cikarildi, tek build girisi birakildi
+- Asama: Release workflow architecture fix
+- Sonuc: push ve manual release akisları ayrildi; release modu artik sadece yerel `inputs/workspace/install.wim` kullanir
 
 ## Tamamlananlar
 
-- `workspace-os/` icerigi `workspace/` altinda toplandi
-- `payload/` icerigi `workspace/payload/` altinda toplandi
-- `isos/` kaynak yapisi `iso-library/` altina tasindi
-- boot asset'leri `boot/assets/` altina tasindi
-- tek resmi build girisi birakildi:
-  - `build/build_cigertool_release.ps1`
-- build yardimcilari `build/internal/` altinda toplandi
-- operasyon scriptleri `cigertool/scripts/` altina tasindi
-- `liveos/`, `winpe/`, legacy build scriptleri ve eski workflow'lar kaldirildi
-- uygulama ici runtime, ayarlar ve ISO tarama dili final workspace modeline gore temizlendi
-- dokumanlar final mimariye gore yeniden yazildi
-- GitHub Actions release workflow'u iki modlu hale getirildi:
-  - `push` -> `PlanOnly`
-  - `workflow_dispatch` + WIM kaynagi -> gercek ISO build
+- `push` akisi validation/plan only olarak korundu
+- `workflow_dispatch` + `build_mode=release` gercek ISO build yolu olarak ayrildi
+- release workflow icindeki `workspace_wim_url` ve URL indirme mantigi kaldirildi
+- manual release artik yalnizca repo working tree icindeki `inputs/workspace/install.wim` dosyasini kabul ediyor
+- `.gitignore` yerel WIM girdisini acikca koruyacak sekilde guncellendi
+- README ve release dokumanlari yeni akisla hizalandi
 
 ## Ana Build Girisi
 
@@ -31,9 +23,14 @@ Plan dogrulama:
 
 - `build/build_cigertool_release.ps1 -PlanOnly`
 
+## Release Ozet
+
+- `push` -> `cigertool-release-plan`
+- `workflow_dispatch` + `build_mode=release` -> `CigerTool-Workspace`
+
 ## Kalan Riskler
 
-- Gercek full build hala yonetici hakli Windows host ister
+- Gercek full build hala yonetici hakli Windows ortami ister
+- Manual release akisinin calismasi icin self-hosted Windows runner gerekir
+- Self-hosted runner working tree icinde `inputs/workspace/install.wim` dosyasi release oncesi hazir olmalidir
 - Gercek USB/VM boot smoke testi ayrica yapilmalidir
-- ISO profilleme bazi medya ailelerinde hala heuristic temellidir
-- GitHub Actions uzerinde gercek release icin runner'in erisebildigi bir `install.wim` kaynagi gerekir
