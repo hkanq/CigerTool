@@ -236,6 +236,35 @@ function Copy-CigerToolSupportScripts {
     }
 }
 
+function Ensure-RegistryKey {
+    param([Parameter(Mandatory = $true)][string]$PathValue)
+
+    if (Test-Path -LiteralPath $PathValue) {
+        return
+    }
+
+    $parentPath = Split-Path -Path $PathValue -Parent
+    if (-not [string]::IsNullOrWhiteSpace($parentPath) -and $parentPath -ne $PathValue) {
+        Ensure-RegistryKey -PathValue $parentPath
+    }
+
+    if (-not (Test-Path -LiteralPath $PathValue)) {
+        New-Item -Path $parentPath -Name (Split-Path -Path $PathValue -Leaf) -Force | Out-Null
+    }
+}
+
+function Set-RegistryValue {
+    param(
+        [Parameter(Mandatory = $true)][string]$PathValue,
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][object]$Value,
+        [Parameter(Mandatory = $true)][ValidateSet("String", "DWord")][string]$PropertyType
+    )
+
+    Ensure-RegistryKey -PathValue $PathValue
+    New-ItemProperty -Path $PathValue -Name $Name -Value $Value -PropertyType $PropertyType -Force | Out-Null
+}
+
 function Set-WorkspaceOfflineRegistry {
     param([Parameter(Mandatory = $true)][string]$WorkspaceWindowsRoot)
 
@@ -247,19 +276,26 @@ function Set-WorkspaceOfflineRegistry {
     & reg.exe load HKLM\CTWSYS $systemHive | Out-Null
     try {
         $runCommand = 'powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File "C:\Program Files\CigerToolWorkspace\startup\Start-CigerToolWorkspace.ps1"'
-        & reg.exe add "HKLM\CTWSOFT\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoAdminLogon /t REG_SZ /d 1 /f | Out-Null
-        & reg.exe add "HKLM\CTWSOFT\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultUserName /t REG_SZ /d CigerTool /f | Out-Null
-        & reg.exe add "HKLM\CTWSOFT\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultPassword /t REG_SZ /d "" /f | Out-Null
-        & reg.exe add "HKLM\CTWSOFT\Microsoft\Windows NT\CurrentVersion\Winlogon" /v ForceAutoLogon /t REG_SZ /d 1 /f | Out-Null
-        & reg.exe add "HKLM\CTWSOFT\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoLogonCount /t REG_DWORD /d 999 /f | Out-Null
-        & reg.exe add "HKLM\CTWSOFT\Microsoft\Windows\CurrentVersion\Run" /v CigerToolWorkspace /t REG_SZ /d $runCommand /f | Out-Null
-        & reg.exe add "HKLM\CTWSOFT\Microsoft\Windows\CurrentVersion\Policies\System" /v EnableFirstLogonAnimation /t REG_DWORD /d 0 /f | Out-Null
-        & reg.exe add "HKLM\CTWSOFT\Policies\Microsoft\Windows\CloudContent" /v DisableConsumerFeatures /t REG_DWORD /d 1 /f | Out-Null
-        & reg.exe add "HKLM\CTWSOFT\Microsoft\Windows\CurrentVersion\OOBE" /v HideEULAPage /t REG_DWORD /d 1 /f | Out-Null
-        & reg.exe add "HKLM\CTWSOFT\Microsoft\Windows\CurrentVersion\OOBE" /v HideWirelessSetupInOOBE /t REG_DWORD /d 1 /f | Out-Null
-        & reg.exe add "HKLM\CTWSOFT\Microsoft\Windows\CurrentVersion\OOBE" /v SkipMachineOOBE /t REG_DWORD /d 1 /f | Out-Null
-        & reg.exe add "HKLM\CTWSOFT\Microsoft\Windows\CurrentVersion\OOBE" /v SkipUserOOBE /t REG_DWORD /d 1 /f | Out-Null
-        & reg.exe add "HKLM\CTWSYS\ControlSet001\Control" /v PortableOperatingSystem /t REG_DWORD /d 1 /f | Out-Null
+        $winlogonPath = "Registry::HKEY_LOCAL_MACHINE\CTWSOFT\Microsoft\Windows NT\CurrentVersion\Winlogon"
+        $runPath = "Registry::HKEY_LOCAL_MACHINE\CTWSOFT\Microsoft\Windows\CurrentVersion\Run"
+        $policyPath = "Registry::HKEY_LOCAL_MACHINE\CTWSOFT\Microsoft\Windows\CurrentVersion\Policies\System"
+        $cloudContentPath = "Registry::HKEY_LOCAL_MACHINE\CTWSOFT\Policies\Microsoft\Windows\CloudContent"
+        $oobePath = "Registry::HKEY_LOCAL_MACHINE\CTWSOFT\Microsoft\Windows\CurrentVersion\OOBE"
+        $controlPath = "Registry::HKEY_LOCAL_MACHINE\CTWSYS\ControlSet001\Control"
+
+        Set-RegistryValue -PathValue $winlogonPath -Name "AutoAdminLogon" -Value "1" -PropertyType String
+        Set-RegistryValue -PathValue $winlogonPath -Name "DefaultUserName" -Value "CigerTool" -PropertyType String
+        Set-RegistryValue -PathValue $winlogonPath -Name "DefaultPassword" -Value "" -PropertyType String
+        Set-RegistryValue -PathValue $winlogonPath -Name "ForceAutoLogon" -Value "1" -PropertyType String
+        Set-RegistryValue -PathValue $winlogonPath -Name "AutoLogonCount" -Value 999 -PropertyType DWord
+        Set-RegistryValue -PathValue $runPath -Name "CigerToolWorkspace" -Value $runCommand -PropertyType String
+        Set-RegistryValue -PathValue $policyPath -Name "EnableFirstLogonAnimation" -Value 0 -PropertyType DWord
+        Set-RegistryValue -PathValue $cloudContentPath -Name "DisableConsumerFeatures" -Value 1 -PropertyType DWord
+        Set-RegistryValue -PathValue $oobePath -Name "HideEULAPage" -Value 1 -PropertyType DWord
+        Set-RegistryValue -PathValue $oobePath -Name "HideWirelessSetupInOOBE" -Value 1 -PropertyType DWord
+        Set-RegistryValue -PathValue $oobePath -Name "SkipMachineOOBE" -Value 1 -PropertyType DWord
+        Set-RegistryValue -PathValue $oobePath -Name "SkipUserOOBE" -Value 1 -PropertyType DWord
+        Set-RegistryValue -PathValue $controlPath -Name "PortableOperatingSystem" -Value 1 -PropertyType DWord
         Write-BuildLog "Offline registry workspace startup ve first-run bastirma ayarlari uygulandi."
     }
     finally {

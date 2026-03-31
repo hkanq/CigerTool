@@ -41,6 +41,26 @@ function Ensure-Directory {
     New-Item -ItemType Directory -Force -Path $PathValue | Out-Null
 }
 
+function Get-DirectorySizeBytes {
+    param([Parameter(Mandatory = $true)][string]$PathValue)
+
+    if (-not (Test-Path -LiteralPath $PathValue)) {
+        return [UInt64]0
+    }
+
+    $files = Get-ChildItem -LiteralPath $PathValue -Recurse -File -Force
+    if ($null -eq $files -or $files.Count -eq 0) {
+        return [UInt64]0
+    }
+
+    $measure = $files | Measure-Object -Property Length -Sum
+    if ($null -eq $measure.Sum) {
+        return [UInt64]0
+    }
+
+    return [UInt64]$measure.Sum
+}
+
 function Assert-Path {
     param(
         [Parameter(Mandatory = $true)][string]$PathValue,
@@ -248,7 +268,8 @@ function Assert-LockedWorkspaceDefaults {
     foreach ($requiredToken in @(
         "AutoAdminLogon",
         "DefaultUserName",
-        'DefaultPassword /t REG_SZ /d ""',
+        "DefaultPassword",
+        "New-ItemProperty",
         "ForceAutoLogon",
         "AutoLogonCount",
         "PortableOperatingSystem",
@@ -363,6 +384,18 @@ public static class CigerToolComStreamSaver {
     $fsi.VolumeName = $VolumeName
     $fsi.StageFiles = $false
     $fsi.UseRestrictedCharacterSet = $false
+
+    $sourceBytes = Get-DirectorySizeBytes -PathValue $SourceDirectory
+    $headroomBytes = [UInt64]([Math]::Max([double](512MB), [double][Math]::Ceiling($sourceBytes * 0.05)))
+    $requiredBlocks = [UInt64][Math]::Ceiling(($sourceBytes + $headroomBytes) / 2048.0)
+    if ($requiredBlocks -gt [UInt64][int]::MaxValue) {
+        throw "ISO kapasitesi Int32 block sinirini asiyor. kaynak=$SourceDirectory | boyut=$sourceBytes byte"
+    }
+    $fsi.FreeMediaBlocks = [int]$requiredBlocks
+    $sourceGb = [Math]::Round($sourceBytes / 1GB, 2)
+    $headroomGb = [Math]::Round($headroomBytes / 1GB, 2)
+    Write-ReleaseLog "ISO kapasitesi kaynak boyutuna gore ayarlandi | kaynak=$sourceGb GB | headroom=$headroomGb GB | free_media_blocks=$requiredBlocks"
+
     $fsi.Root.AddTree($SourceDirectory, $false)
     $result = $fsi.CreateResultImage()
     [CigerToolComStreamSaver]::SaveToFile($result.ImageStream, $DestinationPath)

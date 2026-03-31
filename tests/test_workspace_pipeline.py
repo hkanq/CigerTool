@@ -44,6 +44,8 @@ class WorkspacePipelineTests(unittest.TestCase):
         self.assertIn("AutoAdminLogon", script)
         self.assertIn("ForceAutoLogon", script)
         self.assertIn("AutoLogonCount", script)
+        self.assertIn("DefaultPassword", script)
+        self.assertIn("New-ItemProperty", script)
         self.assertIn("PortableOperatingSystem", script)
         self.assertIn("CigerTool.workspace.json", script)
         self.assertIn("native-boot-vhdx", script)

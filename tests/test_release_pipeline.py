@@ -12,6 +12,8 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertIn("CigerTool-Workspace.iso", script)
         self.assertIn("CigerTool-Workspace-debug.zip", script)
         self.assertIn("IMAPI2FS.MsftFileSystemImage", script)
+        self.assertIn("FreeMediaBlocks", script)
+        self.assertIn("Get-DirectorySizeBytes", script)
         self.assertIn("bootmgfw.efi", script)
         self.assertIn("CigerToolWorkspace.vhdx", script)
         self.assertIn("Start-CigerToolWorkspace.ps1", script)
