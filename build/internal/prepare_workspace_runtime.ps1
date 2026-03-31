@@ -179,14 +179,28 @@ function Get-VhdPartition {
         [int]$RetryDelayMilliseconds = 500
     )
 
+    $resolvedVhdPath = [System.IO.Path]::GetFullPath($VhdPath)
     for ($attempt = 0; $attempt -lt $RetryCount; $attempt++) {
         try {
-            $diskImage = Get-DiskImage -ImagePath $VhdPath -ErrorAction Stop
+            $diskImage = Get-DiskImage -ImagePath $resolvedVhdPath -ErrorAction Stop
             if ($diskImage.Attached) {
-                $disk = $diskImage | Get-Disk -ErrorAction Stop
-                $partition = Get-Partition -DiskNumber $disk.Number -PartitionNumber $PartitionNumber -ErrorAction Stop
-                if ($null -ne $partition) {
-                    return $partition
+                $disk = @(Get-Disk -ErrorAction Stop | Where-Object {
+                    -not [string]::IsNullOrWhiteSpace($_.Location) -and
+                    [string]::Equals([string]$_.Location, $resolvedVhdPath, [System.StringComparison]::OrdinalIgnoreCase)
+                } | Select-Object -First 1)
+
+                if (($disk.Count -eq 0) -and (-not [string]::IsNullOrWhiteSpace([string]$diskImage.DevicePath))) {
+                    $devicePath = [string]$diskImage.DevicePath
+                    if ($devicePath -match 'PhysicalDrive(\d+)$') {
+                        $disk = @(Get-Disk -Number ([int]$matches[1]) -ErrorAction SilentlyContinue | Select-Object -First 1)
+                    }
+                }
+
+                if ($disk.Count -gt 0) {
+                    $partition = Get-Partition -DiskNumber $disk[0].Number -PartitionNumber $PartitionNumber -ErrorAction Stop
+                    if ($null -ne $partition) {
+                        return $partition
+                    }
                 }
             }
         }
