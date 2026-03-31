@@ -112,6 +112,42 @@ function Assert-DriveLetterFree {
     }
 }
 
+function Get-FreeDriveLetter {
+    param(
+        [string[]]$PreferredLetters = @("W", "V", "U", "T", "S", "R", "Q", "P", "O", "N", "M"),
+        [string[]]$ExcludedLetters = @()
+    )
+
+    $excluded = @{}
+    foreach ($item in $ExcludedLetters) {
+        if (-not [string]::IsNullOrWhiteSpace($item)) {
+            $excluded[$item.Trim().ToUpperInvariant()] = $true
+        }
+    }
+
+    foreach ($candidate in $PreferredLetters) {
+        if ([string]::IsNullOrWhiteSpace($candidate)) {
+            continue
+        }
+
+        $letter = $candidate.Trim().Substring(0, 1).ToUpperInvariant()
+        if ($excluded.ContainsKey($letter)) {
+            continue
+        }
+
+        if (-not (Test-Path -LiteralPath ($letter + ":\\"))) {
+            return $letter
+        }
+    }
+
+    throw "Kullanilabilir gecici surucu harfi bulunamadi."
+}
+
+function Get-DriveRoot {
+    param([Parameter(Mandatory = $true)][string]$DriveLetter)
+    return ($DriveLetter.Trim().Substring(0, 1).ToUpperInvariant() + ":\")
+}
+
 function Invoke-DiskPartScript {
     param([Parameter(Mandatory = $true)][string[]]$Lines)
 
@@ -458,8 +494,9 @@ if ($PlanOnly) {
     return
 }
 
-Assert-DriveLetterFree -Letter "W"
-Assert-DriveLetterFree -Letter "S"
+$workspaceDriveLetter = Get-FreeDriveLetter -PreferredLetters @("W", "V", "U", "T", "R", "Q", "P", "O")
+$workspaceDriveRoot = Get-DriveRoot -DriveLetter $workspaceDriveLetter
+Write-BuildLog "Workspace VHD icin gecici surucu harfi secildi: $workspaceDriveLetter"
 
 try {
     $installImage = $workspaceWimSource
@@ -472,29 +509,33 @@ try {
         "convert gpt noerr",
         "create partition primary",
         "format quick fs=ntfs label=""CigerTool""",
-        "assign letter=W"
+        "assign letter=$workspaceDriveLetter"
     )
 
-    & dism.exe /Apply-Image /ImageFile:$installImage /Index:$ImageIndex /ApplyDir:W:\ | Out-Null
+    & dism.exe /Apply-Image /ImageFile:$installImage /Index:$ImageIndex /ApplyDir:$workspaceDriveRoot | Out-Null
     if ($LASTEXITCODE -ne 0) {
         throw "DISM image apply basarisiz oldu."
     }
     Write-BuildLog "Windows image workspace VHDX icine uygulandi."
 
-    & dism.exe /Image:W:\ /Set-AllIntl:tr-TR | Out-Null
-    & dism.exe /Image:W:\ /Set-TimeZone:"Turkey Standard Time" | Out-Null
+    & dism.exe /Image:$workspaceDriveRoot /Set-AllIntl:tr-TR | Out-Null
+    & dism.exe /Image:$workspaceDriveRoot /Set-TimeZone:"Turkey Standard Time" | Out-Null
     Write-BuildLog "Offline locale ve timezone ayarlari uygulandi."
 
-    Ensure-VhdMounted -VhdPath $workspaceVhdPath -DriveLetter "W" -Label "Workspace VHD"
-    Copy-Item -LiteralPath $unattendSource -Destination "W:\Windows\Panther\Unattend.xml" -Force
-    Copy-DirectoryContents -SourcePath $workspaceStartupSource -DestinationPath "W:\Program Files\CigerToolWorkspace\startup" -Description "workspace startup runtime"
+    Ensure-VhdMounted -VhdPath $workspaceVhdPath -DriveLetter $workspaceDriveLetter -Label "Workspace VHD"
+    Copy-Item -LiteralPath $unattendSource -Destination (Join-Path $workspaceDriveRoot "Windows\Panther\Unattend.xml") -Force
+    Copy-DirectoryContents -SourcePath $workspaceStartupSource -DestinationPath (Join-Path $workspaceDriveRoot "Program Files\CigerToolWorkspace\startup") -Description "workspace startup runtime"
     if (Test-Path -LiteralPath $appSourceRoot) {
-        Copy-DirectoryContents -SourcePath $appSourceRoot -DestinationPath "W:\Program Files\CigerTool" -Description "workspace app runtime"
-        Copy-CigerToolSupportScripts -ProjectRoot $projectRoot -DestinationScriptsRoot "W:\Program Files\CigerTool\scripts"
+        Copy-DirectoryContents -SourcePath $appSourceRoot -DestinationPath (Join-Path $workspaceDriveRoot "Program Files\CigerTool") -Description "workspace app runtime"
+        Copy-CigerToolSupportScripts -ProjectRoot $projectRoot -DestinationScriptsRoot (Join-Path $workspaceDriveRoot "Program Files\CigerTool\scripts")
     }
 
-    Copy-WorkspacePayloadOverlay -PayloadSourceRoot $payloadSourceRoot -WorkspaceWindowsRoot "W:\"
-    Set-WorkspaceOfflineRegistry -WorkspaceWindowsRoot "W:\"
+    Copy-WorkspacePayloadOverlay -PayloadSourceRoot $payloadSourceRoot -WorkspaceWindowsRoot $workspaceDriveRoot
+    Set-WorkspaceOfflineRegistry -WorkspaceWindowsRoot $workspaceDriveRoot
+
+    $efiDriveLetter = Get-FreeDriveLetter -PreferredLetters @("S", "Y", "X", "Z", "R", "Q", "P", "O") -ExcludedLetters @($workspaceDriveLetter)
+    $efiDriveRoot = Get-DriveRoot -DriveLetter $efiDriveLetter
+    Write-BuildLog "EFI VHD icin gecici surucu harfi secildi: $efiDriveLetter"
 
     Invoke-DiskPartScript -Lines @(
         "create vdisk file=""$efiVhdPath"" maximum=256 type=fixed",
@@ -503,17 +544,17 @@ try {
         "convert gpt noerr",
         "create partition efi size=128",
         "format quick fs=fat32 label=""SYSTEM""",
-        "assign letter=S"
+        "assign letter=$efiDriveLetter"
     )
 
-    Ensure-VhdMounted -VhdPath $workspaceVhdPath -DriveLetter "W" -Label "Workspace VHD"
-    Ensure-VhdMounted -VhdPath $efiVhdPath -DriveLetter "S" -Label "EFI VHD"
-    & bcdboot W:\Windows /s S: /f UEFI /d | Out-Null
+    Ensure-VhdMounted -VhdPath $workspaceVhdPath -DriveLetter $workspaceDriveLetter -Label "Workspace VHD"
+    Ensure-VhdMounted -VhdPath $efiVhdPath -DriveLetter $efiDriveLetter -Label "EFI VHD"
+    & bcdboot (Join-Path $workspaceDriveRoot "Windows") /s ($efiDriveLetter + ":") /f UEFI /d | Out-Null
     if ($LASTEXITCODE -ne 0) {
         throw "bcdboot basarisiz oldu."
     }
 
-    $bcdStore = "S:\EFI\Microsoft\Boot\BCD"
+    $bcdStore = Join-Path $efiDriveRoot "EFI\Microsoft\Boot\BCD"
     $loaderId = Get-BcdOsLoaderIdentifier -StorePath $bcdStore
     & bcdedit /store $bcdStore /set $loaderId description "CigerTool Workspace" | Out-Null
     & bcdedit /store $bcdStore /set $loaderId device "vhd=[locate]\workspace\$WorkspaceVhdName" | Out-Null
@@ -524,12 +565,12 @@ try {
     & bcdedit /store $bcdStore /set "{bootmgr}" timeout 3 | Out-Null
     Write-BuildLog "BCD store workspace VHDX native boot icin guncellendi."
 
-    Ensure-VhdMounted -VhdPath $efiVhdPath -DriveLetter "S" -Label "EFI VHD"
+    Ensure-VhdMounted -VhdPath $efiVhdPath -DriveLetter $efiDriveLetter -Label "EFI VHD"
     Ensure-Directory -PathValue (Join-Path $usbLayoutRoot "EFI")
     Ensure-Directory -PathValue (Join-Path $usbLayoutRoot "Boot")
-    Copy-DirectoryContents -SourcePath "S:\EFI" -DestinationPath (Join-Path $usbLayoutRoot "EFI") -Description "USB EFI layout"
-    if (Test-Path -LiteralPath "S:\Boot") {
-        Copy-DirectoryContents -SourcePath "S:\Boot" -DestinationPath (Join-Path $usbLayoutRoot "Boot") -Description "USB Boot layout" -Optional
+    Copy-DirectoryContents -SourcePath (Join-Path $efiDriveRoot "EFI") -DestinationPath (Join-Path $usbLayoutRoot "EFI") -Description "USB EFI layout"
+    if (Test-Path -LiteralPath (Join-Path $efiDriveRoot "Boot")) {
+        Copy-DirectoryContents -SourcePath (Join-Path $efiDriveRoot "Boot") -DestinationPath (Join-Path $usbLayoutRoot "Boot") -Description "USB Boot layout" -Optional
     }
     Copy-Item -LiteralPath $workspaceVhdPath -Destination $usbWorkspaceVhdPath -Force
     Write-BuildLog "Workspace VHDX USB layout altina kopyalandi: $usbWorkspaceVhdPath"
