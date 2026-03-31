@@ -40,6 +40,7 @@ class WorkspacePipelineTests(unittest.TestCase):
         self.assertIn("CigerToolWorkspace.vhdx", script)
         self.assertIn("Windows\\Panther\\Unattend.xml", script)
         self.assertIn("Ensure-VhdMounted", script)
+        self.assertIn("Mount-VhdAndAssignDriveLetter", script)
         self.assertIn("Assert-SufficientFreeSpace", script)
         self.assertIn("AutoAdminLogon", script)
         self.assertIn("ForceAutoLogon", script)

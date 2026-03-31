@@ -104,14 +104,6 @@ function Copy-SourcesToDestination {
     }
 }
 
-function Assert-DriveLetterFree {
-    param([Parameter(Mandatory = $true)][string]$Letter)
-
-    if (Test-Path -LiteralPath ($Letter + ":\\")) {
-        throw "Gecici surucu harfi dolu: $Letter"
-    }
-}
-
 function Get-FreeDriveLetter {
     param(
         [string[]]$PreferredLetters = @("W", "V", "U", "T", "S", "R", "Q", "P", "O", "N", "M"),
@@ -146,6 +138,53 @@ function Get-FreeDriveLetter {
 function Get-DriveRoot {
     param([Parameter(Mandatory = $true)][string]$DriveLetter)
     return ($DriveLetter.Trim().Substring(0, 1).ToUpperInvariant() + ":\")
+}
+
+function Mount-VhdAndAssignDriveLetter {
+    param(
+        [Parameter(Mandatory = $true)][string]$VhdPath,
+        [Parameter(Mandatory = $true)][string[]]$PreferredLetters,
+        [Parameter(Mandatory = $true)][string]$Label,
+        [int]$PartitionNumber = 1,
+        [string[]]$ExcludedLetters = @()
+    )
+
+    $triedLetters = New-Object System.Collections.Generic.HashSet[string]([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($candidate in @($PreferredLetters + (Get-FreeDriveLetter -PreferredLetters @("Z", "Y", "X", "W", "V", "U", "T", "S", "R", "Q", "P", "O", "N", "M") -ExcludedLetters $ExcludedLetters))) {
+        if ([string]::IsNullOrWhiteSpace($candidate)) {
+            continue
+        }
+
+        $letter = $candidate.Trim().Substring(0, 1).ToUpperInvariant()
+        if (-not $triedLetters.Add($letter)) {
+            continue
+        }
+
+        if (Test-Path -LiteralPath ($letter + ":\\")) {
+            Write-BuildLog "$Label icin surucu harfi atlandi, kullanimda gorunuyor: $letter" "WARN"
+            continue
+        }
+
+        try {
+            Invoke-DiskPartScript -Lines @(
+                "select vdisk file=""$VhdPath""",
+                "attach vdisk noerr",
+                "select partition $PartitionNumber",
+                "assign letter=$letter noerr"
+            )
+        }
+        catch {
+            Write-BuildLog "$Label icin surucu harfi atanamadi: $letter | $($_.Exception.Message)" "WARN"
+            continue
+        }
+
+        if (Test-Path -LiteralPath ($letter + ":\\")) {
+            Write-BuildLog "$Label icin gecici surucu harfi secildi: $letter"
+            return $letter
+        }
+    }
+
+    throw "$Label icin atanabilir gecici surucu harfi bulunamadi."
 }
 
 function Invoke-DiskPartScript {
@@ -494,10 +533,6 @@ if ($PlanOnly) {
     return
 }
 
-$workspaceDriveLetter = Get-FreeDriveLetter -PreferredLetters @("W", "V", "U", "T", "R", "Q", "P", "O")
-$workspaceDriveRoot = Get-DriveRoot -DriveLetter $workspaceDriveLetter
-Write-BuildLog "Workspace VHD icin gecici surucu harfi secildi: $workspaceDriveLetter"
-
 try {
     $installImage = $workspaceWimSource
     Write-BuildLog "Workspace WIM kaynagi bulundu: $installImage"
@@ -508,9 +543,11 @@ try {
         "attach vdisk",
         "convert gpt noerr",
         "create partition primary",
-        "format quick fs=ntfs label=""CigerTool""",
-        "assign letter=$workspaceDriveLetter"
+        "format quick fs=ntfs label=""CigerTool"""
     )
+
+    $workspaceDriveLetter = Mount-VhdAndAssignDriveLetter -VhdPath $workspaceVhdPath -PreferredLetters @("W", "V", "U", "T", "R", "Q", "P", "O") -Label "Workspace VHD"
+    $workspaceDriveRoot = Get-DriveRoot -DriveLetter $workspaceDriveLetter
 
     & dism.exe /Apply-Image /ImageFile:$installImage /Index:$ImageIndex /ApplyDir:$workspaceDriveRoot | Out-Null
     if ($LASTEXITCODE -ne 0) {
@@ -533,19 +570,17 @@ try {
     Copy-WorkspacePayloadOverlay -PayloadSourceRoot $payloadSourceRoot -WorkspaceWindowsRoot $workspaceDriveRoot
     Set-WorkspaceOfflineRegistry -WorkspaceWindowsRoot $workspaceDriveRoot
 
-    $efiDriveLetter = Get-FreeDriveLetter -PreferredLetters @("S", "Y", "X", "Z", "R", "Q", "P", "O") -ExcludedLetters @($workspaceDriveLetter)
-    $efiDriveRoot = Get-DriveRoot -DriveLetter $efiDriveLetter
-    Write-BuildLog "EFI VHD icin gecici surucu harfi secildi: $efiDriveLetter"
-
     Invoke-DiskPartScript -Lines @(
         "create vdisk file=""$efiVhdPath"" maximum=256 type=fixed",
         "select vdisk file=""$efiVhdPath""",
         "attach vdisk",
         "convert gpt noerr",
         "create partition efi size=128",
-        "format quick fs=fat32 label=""SYSTEM""",
-        "assign letter=$efiDriveLetter"
+        "format quick fs=fat32 label=""SYSTEM"""
     )
+
+    $efiDriveLetter = Mount-VhdAndAssignDriveLetter -VhdPath $efiVhdPath -PreferredLetters @("S", "Y", "X", "Z", "R", "Q", "P", "O") -ExcludedLetters @($workspaceDriveLetter) -Label "EFI VHD"
+    $efiDriveRoot = Get-DriveRoot -DriveLetter $efiDriveLetter
 
     Ensure-VhdMounted -VhdPath $workspaceVhdPath -DriveLetter $workspaceDriveLetter -Label "Workspace VHD"
     Ensure-VhdMounted -VhdPath $efiVhdPath -DriveLetter $efiDriveLetter -Label "EFI VHD"
