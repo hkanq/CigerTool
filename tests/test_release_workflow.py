@@ -18,6 +18,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("Validate local Python", workflow)
         self.assertIn("Validate runner elevation", workflow)
         self.assertIn("git clone", workflow)
+        self.assertIn('git config --global --add safe.directory "%REPO_ROOT%"', workflow)
         self.assertIn("GITHUB_TOKEN: ${{ github.token }}", workflow)
         self.assertIn("shell: cmd", workflow)
         self.assertIn("powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File", workflow)

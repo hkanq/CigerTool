@@ -115,6 +115,7 @@ jobs:
           set "REPO_PARENT=%REPO_ROOT%\.."
           if not exist "%REPO_PARENT%" mkdir "%REPO_PARENT%"
           set "REMOTE_URL=https://x-access-token:%GITHUB_TOKEN%@github.com/%GITHUB_REPOSITORY%.git"
+          git config --global --add safe.directory "%REPO_ROOT%"
 
           if not exist "%REPO_ROOT%\.git" (
             git clone "%REMOTE_URL%" "%REPO_ROOT%"
