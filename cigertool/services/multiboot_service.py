@@ -226,13 +226,12 @@ class MultibootService:
             return IsoCategory.LINUX
         if library_section == "tools":
             return IsoCategory.TOOLS
-        rendered = str(path).lower()
-        parts = [part.lower() for part in path.parts]
-        if any(part == "windows" for part in parts) or any(token in rendered for token in ("windows", "win10", "win11", "server")):
+        filename = path.name.lower()
+        if any(token in filename for token in ("windows", "win10", "win11", "server")):
             return IsoCategory.WINDOWS
-        if any(part == "linux" for part in parts):
+        if "linux" in filename:
             return IsoCategory.LINUX
-        if any(part == "tools" for part in parts):
+        if any(token in filename for token in ("tool", "rescue", "diagnostic", "utility")):
             return IsoCategory.TOOLS
         return IsoCategory.OTHER
 

@@ -117,6 +117,20 @@ class MultibootServiceTests(unittest.TestCase):
             self.assertEqual(entry.failure_reason, "incompatible ISO type")
             self.assertEqual(entry.library_section, "legacy")
 
+    def test_does_not_classify_iso_from_windows_host_path_as_windows_media(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "Windows" / "HostTemp" / "iso-library"
+            root.mkdir(parents=True)
+            iso = root / "mystery.iso"
+            iso.write_bytes(b"x")
+
+            entry = self.service.profile_iso(iso, root)
+
+            self.assertEqual(entry.category, IsoCategory.OTHER)
+            self.assertEqual(entry.support_status, IsoSupportStatus.UNSUPPORTED)
+            self.assertEqual(entry.failure_reason, "incompatible ISO type")
+            self.assertEqual(entry.library_section, "legacy")
+
     def test_scan_isos_deduplicates_duplicate_roots(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "isos" / "windows"
