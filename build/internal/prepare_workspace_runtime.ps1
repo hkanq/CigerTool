@@ -133,6 +133,56 @@ function Invoke-DiskPartScript {
     }
 }
 
+function Ensure-VhdMounted {
+    param(
+        [Parameter(Mandatory = $true)][string]$VhdPath,
+        [Parameter(Mandatory = $true)][string]$DriveLetter,
+        [Parameter(Mandatory = $true)][string]$Label,
+        [int]$PartitionNumber = 1
+    )
+
+    if (Test-Path -LiteralPath ($DriveLetter + ":\\")) {
+        return
+    }
+
+    Write-BuildLog "$Label surucusu bagli degil, yeniden baglanmaya calisiliyor: $VhdPath" "WARN"
+    Invoke-DiskPartScript -Lines @(
+        "select vdisk file=""$VhdPath""",
+        "attach vdisk",
+        "select partition $PartitionNumber",
+        "assign letter=$DriveLetter noerr"
+    )
+
+    if (-not (Test-Path -LiteralPath ($DriveLetter + ":\\"))) {
+        throw "$Label surucusu yeniden baglanamadi: $DriveLetter"
+    }
+
+    Write-BuildLog "$Label surucusu hazir: $DriveLetter"
+}
+
+function Assert-SufficientFreeSpace {
+    param(
+        [Parameter(Mandatory = $true)][string]$PathValue,
+        [Parameter(Mandatory = $true)][UInt64]$RequiredBytes,
+        [Parameter(Mandatory = $true)][string]$Description
+    )
+
+    $root = [System.IO.Path]::GetPathRoot([System.IO.Path]::GetFullPath($PathValue))
+    $drive = [System.IO.DriveInfo]::new($root)
+    if (-not $drive.IsReady) {
+        throw "$Description icin kullanilan surucu hazir degil: $root"
+    }
+
+    if ([UInt64]$drive.AvailableFreeSpace -lt $RequiredBytes) {
+        $freeGb = [math]::Round($drive.AvailableFreeSpace / 1GB, 2)
+        $requiredGb = [math]::Round($RequiredBytes / 1GB, 2)
+        throw "$Description icin yetersiz bos alan. Surucu=$root | bos=$freeGb GB | gereken en az=$requiredGb GB. Daha fazla alan bosaltip tekrar deneyin."
+    }
+
+    $freeGb = [math]::Round($drive.AvailableFreeSpace / 1GB, 2)
+    Write-BuildLog "$Description icin bos alan dogrulandi | surucu=$root | bos=$freeGb GB"
+}
+
 function Copy-WorkspacePayloadOverlay {
     param(
         [Parameter(Mandatory = $true)][string]$PayloadSourceRoot,
@@ -268,6 +318,7 @@ $workspaceWimSource = Resolve-ProjectPath -ProjectRoot $projectRoot -PathValue $
 $unattendSource = Join-Path $projectRoot "workspace\unattend\CigerToolWorkspace.Unattend.xml"
 $workspaceStartupSource = Join-Path $projectRoot "workspace\startup"
 $workspaceVhdPath = Join-Path $workspaceRoot $WorkspaceVhdName
+$efiVhdPath = Join-Path $workspaceRoot "CigerTool-EfiSystem.vhdx"
 $usbWorkspaceRoot = Join-Path $usbLayoutRoot "workspace"
 $usbWorkspaceVhdPath = Join-Path $usbWorkspaceRoot $WorkspaceVhdName
 
@@ -287,6 +338,15 @@ Ensure-Directory -PathValue $stageAppRoot
 Assert-Path -PathValue $workspaceWimSource -Description "Hazir workspace WIM girdisi (beklenen yol: inputs\workspace\install.wim)"
 Assert-Path -PathValue $unattendSource -Description "Workspace unattend"
 Assert-Path -PathValue $workspaceStartupSource -Description "Workspace startup kaynak klasoru"
+
+$workspaceWimSize = (Get-Item -LiteralPath $workspaceWimSource).Length
+$requiredFreeBytes = [UInt64]([Math]::Max([double](36GB), [double]($workspaceWimSize * 3)))
+if ($PlanOnly) {
+    Write-BuildLog "PlanOnly modu: bos alan on kontrolu atlandi." "WARN"
+}
+else {
+    Assert-SufficientFreeSpace -PathValue $resolvedOutputRoot -RequiredBytes $requiredFreeBytes -Description "Workspace release build"
+}
 
 Copy-DirectoryContents -SourcePath $workspaceStartupSource -DestinationPath (Join-Path $stageWorkspaceRuntime "startup") -Description "workspace startup stage"
 Copy-Item -LiteralPath $unattendSource -Destination (Join-Path $manifestRoot "CigerToolWorkspace.Unattend.xml") -Force
@@ -389,6 +449,7 @@ try {
     & dism.exe /Image:W:\ /Set-TimeZone:"Turkey Standard Time" | Out-Null
     Write-BuildLog "Offline locale ve timezone ayarlari uygulandi."
 
+    Ensure-VhdMounted -VhdPath $workspaceVhdPath -DriveLetter "W" -Label "Workspace VHD"
     Copy-Item -LiteralPath $unattendSource -Destination "W:\Windows\Panther\Unattend.xml" -Force
     Copy-DirectoryContents -SourcePath $workspaceStartupSource -DestinationPath "W:\Program Files\CigerToolWorkspace\startup" -Description "workspace startup runtime"
     if (Test-Path -LiteralPath $appSourceRoot) {
@@ -399,7 +460,6 @@ try {
     Copy-WorkspacePayloadOverlay -PayloadSourceRoot $payloadSourceRoot -WorkspaceWindowsRoot "W:\"
     Set-WorkspaceOfflineRegistry -WorkspaceWindowsRoot "W:\"
 
-    $efiVhdPath = Join-Path $workspaceRoot "CigerTool-EfiSystem.vhdx"
     Invoke-DiskPartScript -Lines @(
         "create vdisk file=""$efiVhdPath"" maximum=256 type=fixed",
         "select vdisk file=""$efiVhdPath""",
@@ -410,6 +470,8 @@ try {
         "assign letter=S"
     )
 
+    Ensure-VhdMounted -VhdPath $workspaceVhdPath -DriveLetter "W" -Label "Workspace VHD"
+    Ensure-VhdMounted -VhdPath $efiVhdPath -DriveLetter "S" -Label "EFI VHD"
     & bcdboot W:\Windows /s S: /f UEFI /d | Out-Null
     if ($LASTEXITCODE -ne 0) {
         throw "bcdboot basarisiz oldu."
@@ -426,6 +488,7 @@ try {
     & bcdedit /store $bcdStore /set "{bootmgr}" timeout 3 | Out-Null
     Write-BuildLog "BCD store workspace VHDX native boot icin guncellendi."
 
+    Ensure-VhdMounted -VhdPath $efiVhdPath -DriveLetter "S" -Label "EFI VHD"
     Ensure-Directory -PathValue (Join-Path $usbLayoutRoot "EFI")
     Ensure-Directory -PathValue (Join-Path $usbLayoutRoot "Boot")
     Copy-DirectoryContents -SourcePath "S:\EFI" -DestinationPath (Join-Path $usbLayoutRoot "EFI") -Description "USB EFI layout"
