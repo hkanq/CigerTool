@@ -59,10 +59,13 @@ GitHub Actions artifact adı:
 3. `install.wim` dosyasını şu tam yola koy:
    `C:\actions-runner\cigertool-release\repo\inputs\workspace\install.wim`
 4. Self-hosted runner makinesinde Python 3.12+ kurulu ve `python` PATH içinde olsun.
-5. GitHub Actions içinde `Build CigerTool Release` workflow'unu çalıştır.
-6. `build_mode=release` seç.
-7. Workflow tamamlandığında `CigerTool-Workspace` artifact'ini indir.
-8. Artifact içinden `CigerTool-Workspace.iso` dosyasını al.
+5. Self-hosted runner servisi yerel administrator haklarıyla çalışsın.
+   `NT AUTHORITY\NETWORK SERVICE` veya benzeri sınırlı servis hesapları gerçek ISO build için yeterli değildir.
+   Gerekirse runner servisini administrator hesabıyla yeniden yapılandırın veya `run.cmd` dosyasını yükseltilmiş terminalde başlatın.
+6. GitHub Actions içinde `Build CigerTool Release` workflow'unu çalıştır.
+7. `build_mode=release` seç.
+8. Workflow tamamlandığında `CigerTool-Workspace` artifact'ini indir.
+9. Artifact içinden `CigerTool-Workspace.iso` dosyasını al.
 
 ## Dağıtım Modeli
 

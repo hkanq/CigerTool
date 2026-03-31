@@ -58,6 +58,15 @@ function Test-IsAdministrator {
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
+function Get-CurrentIdentityName {
+    try {
+        return [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    }
+    catch {
+        return "<unknown>"
+    }
+}
+
 function Assert-PathWithinRoot {
     param(
         [Parameter(Mandatory = $true)][string]$PathValue,
@@ -386,6 +395,11 @@ Assert-Path -PathValue $resolvedWorkspaceWimPath -Description "Hazir workspace W
 Assert-Path -PathValue $resolvedIsoLibraryRoot -Description "ISO Library kaynak klasoru"
 Assert-LockedWorkspaceDefaults -ProjectRoot $projectRoot
 
+if ((-not $PlanOnly) -and (-not (Test-IsAdministrator))) {
+    $identityName = Get-CurrentIdentityName
+    throw "Final artifact generation elevasyon gerektirir. Mevcut Windows kimligi: $identityName. Bu build, VHDX hazirlama icin diskpart ve DISM kullaniyor. Self-hosted runner servisini yerel administrator hesabi ile calistirin veya runner'i yukseltilmis bir terminalden run.cmd ile baslatin."
+}
+
 if (-not $SkipTests) {
     Write-ReleaseLog "Unit testler calistiriliyor."
     & python -m unittest discover -s tests -p "test_*.py"
@@ -395,10 +409,6 @@ if (-not $SkipTests) {
 }
 
 Ensure-AppBuild -ProjectRoot $projectRoot -AppBuildRoot $resolvedAppBuildRoot
-
-if ((-not $PlanOnly) -and (-not (Test-IsAdministrator))) {
-    throw "Final artifact generation elevasyon gerektirir. Bu build, VHDX hazirlama icin diskpart ve DISM kullaniyor. Yonetici olarak yeniden calistirin."
-}
 
 foreach ($generatedPath in @(
     (Join-Path $resolvedOutputRoot "workspace"),

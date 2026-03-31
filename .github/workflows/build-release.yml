@@ -158,6 +158,12 @@ jobs:
           powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$v=[version]'%PYTHON_VERSION%'; if ($v -lt [version]'3.12.0') { throw 'Self-hosted release runner uzerindeki Python surumu yetersiz: %PYTHON_VERSION%. Python 3.12+ gerekir.' }"
           echo Python surumu: %PYTHON_VERSION%
 
+      - name: Validate runner elevation
+        shell: cmd
+        run: |
+          @echo off
+          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$identity=[Security.Principal.WindowsIdentity]::GetCurrent(); $principal=New-Object Security.Principal.WindowsPrincipal($identity); if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw ('Self-hosted release runner admin yetkisi ile calismiyor. Mevcut kimlik: ' + $identity.Name + '. GitHub Actions runner servisini yerel administrator hesabi ile calistirin veya run.cmd dosyasini yukseltilmis terminalde baslatin.') } ; Write-Host ('Runner admin dogrulandi: ' + $identity.Name)"
+
       - name: Install Python dependencies
         shell: cmd
         working-directory: ${{ env.SELF_HOSTED_REPO_ROOT }}

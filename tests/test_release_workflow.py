@@ -16,6 +16,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("SELF_HOSTED_REPO_ROOT", workflow)
         self.assertIn("Prepare local release repository", workflow)
         self.assertIn("Validate local Python", workflow)
+        self.assertIn("Validate runner elevation", workflow)
         self.assertIn("git clone", workflow)
         self.assertIn("GITHUB_TOKEN: ${{ github.token }}", workflow)
         self.assertIn("shell: cmd", workflow)

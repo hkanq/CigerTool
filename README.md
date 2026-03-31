@@ -51,7 +51,10 @@ Manual Actions release öncesi:
 1. Self-hosted runner makinesinde şu klasöre `install.wim` koy:
    - `C:\actions-runner\cigertool-release\repo\inputs\workspace\install.wim`
 2. Aynı makinede Python 3.12+ kurulu ve `python` komutu PATH içinde olsun
-3. GitHub Actions üzerinden `Build CigerTool Release` workflow'unu `build_mode=release` ile çalıştır
+3. Self-hosted runner servisi yerel administrator haklarıyla çalışsın
+   - `NT AUTHORITY\NETWORK SERVICE` hesabı yeterli değildir
+   - gerekirse runner servisini administrator hesabıyla yeniden kur ya da `run.cmd` dosyasını yükseltilmiş terminalde başlat
+4. GitHub Actions üzerinden `Build CigerTool Release` workflow'unu `build_mode=release` ile çalıştır
 
 ## Ana Çıktı
 
