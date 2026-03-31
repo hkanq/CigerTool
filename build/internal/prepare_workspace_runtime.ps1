@@ -171,10 +171,53 @@ function Normalize-DriveLetter {
     return $letter
 }
 
+function Resolve-VhdPartition {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$Partitions,
+        [int]$PartitionNumber = 0,
+        [string]$PartitionRole = "BasicData"
+    )
+
+    if ($PartitionNumber -gt 0) {
+        return @($Partitions | Where-Object { $_.PartitionNumber -eq $PartitionNumber } | Select-Object -First 1)
+    }
+
+    $basicDataGuid = "{EBD0A0A2-B9E5-4433-87C0-68B6B72699C7}"
+    $efiSystemGuid = "{C12A7328-F81F-11D2-BA4B-00A0C93EC93B}"
+
+    if ($PartitionRole -eq "EfiSystem") {
+        $match = @($Partitions | Where-Object {
+            ([string]$_.GptType).ToUpperInvariant() -eq $efiSystemGuid -or
+            ([string]$_.Type).ToUpperInvariant() -eq "SYSTEM"
+        } | Sort-Object Size -Descending | Select-Object -First 1)
+        if ($match.Count -gt 0) {
+            return $match
+        }
+    }
+
+    $match = @($Partitions | Where-Object {
+        ([string]$_.GptType).ToUpperInvariant() -eq $basicDataGuid -or
+        ([string]$_.Type).ToUpperInvariant() -eq "BASIC"
+    } | Sort-Object Size -Descending | Select-Object -First 1)
+    if ($match.Count -gt 0) {
+        return $match
+    }
+
+    $fallback = @($Partitions | Where-Object {
+        ([string]$_.Type).ToUpperInvariant() -ne "RESERVED"
+    } | Sort-Object Size -Descending | Select-Object -First 1)
+    if ($fallback.Count -gt 0) {
+        return $fallback
+    }
+
+    return @()
+}
+
 function Get-VhdPartition {
     param(
         [Parameter(Mandatory = $true)][string]$VhdPath,
-        [int]$PartitionNumber = 1,
+        [int]$PartitionNumber = 0,
+        [string]$PartitionRole = "BasicData",
         [int]$RetryCount = 12,
         [int]$RetryDelayMilliseconds = 500
     )
@@ -197,9 +240,10 @@ function Get-VhdPartition {
                 }
 
                 if ($disk.Count -gt 0) {
-                    $partition = Get-Partition -DiskNumber $disk[0].Number -PartitionNumber $PartitionNumber -ErrorAction Stop
-                    if ($null -ne $partition) {
-                        return $partition
+                    $partitions = @(Get-Partition -DiskNumber $disk[0].Number -ErrorAction Stop)
+                    $partition = Resolve-VhdPartition -Partitions $partitions -PartitionNumber $PartitionNumber -PartitionRole $PartitionRole
+                    if ($partition.Count -gt 0 -and $null -ne $partition[0]) {
+                        return $partition[0]
                     }
                 }
             }
@@ -219,14 +263,35 @@ function Get-VhdPartition {
 function Get-VhdDriveLetter {
     param(
         [Parameter(Mandatory = $true)][string]$VhdPath,
-        [int]$PartitionNumber = 1,
+        [int]$PartitionNumber = 0,
+        [string]$PartitionRole = "BasicData",
         [int]$RetryCount = 1,
         [int]$RetryDelayMilliseconds = 0
     )
 
-    $partition = Get-VhdPartition -VhdPath $VhdPath -PartitionNumber $PartitionNumber -RetryCount $RetryCount -RetryDelayMilliseconds $RetryDelayMilliseconds
+    $partition = Get-VhdPartition -VhdPath $VhdPath -PartitionNumber $PartitionNumber -PartitionRole $PartitionRole -RetryCount $RetryCount -RetryDelayMilliseconds $RetryDelayMilliseconds
     if ($null -eq $partition) {
         return $null
+    }
+
+    foreach ($accessPath in @($partition.AccessPaths)) {
+        if ([string]::IsNullOrWhiteSpace($accessPath)) {
+            continue
+        }
+
+        if ($accessPath -match '^([A-Za-z]):\\$') {
+            return (Normalize-DriveLetter -DriveLetter $matches[1])
+        }
+    }
+
+    try {
+        $volume = $partition | Get-Volume -ErrorAction Stop | Select-Object -First 1
+        $volumeLetter = Normalize-DriveLetter -DriveLetter $volume.DriveLetter
+        if ($null -ne $volumeLetter) {
+            return $volumeLetter
+        }
+    }
+    catch {
     }
 
     return (Normalize-DriveLetter -DriveLetter $partition.DriveLetter)
@@ -237,7 +302,8 @@ function Set-VhdDriveLetter {
         [Parameter(Mandatory = $true)][string]$VhdPath,
         [Parameter(Mandatory = $true)][string]$DriveLetter,
         [Parameter(Mandatory = $true)][string]$Label,
-        [int]$PartitionNumber = 1
+        [int]$PartitionNumber = 0,
+        [string]$PartitionRole = "BasicData"
     )
 
     $normalizedLetter = Normalize-DriveLetter -DriveLetter $DriveLetter
@@ -245,12 +311,12 @@ function Set-VhdDriveLetter {
         throw "$Label icin gecersiz surucu harfi verildi: $DriveLetter"
     }
 
-    $partition = Get-VhdPartition -VhdPath $VhdPath -PartitionNumber $PartitionNumber
+    $partition = Get-VhdPartition -VhdPath $VhdPath -PartitionNumber $PartitionNumber -PartitionRole $PartitionRole
     if ($null -eq $partition) {
         throw "$Label partition bilgisi hazir degil: $VhdPath"
     }
 
-    $currentLetter = Get-VhdDriveLetter -VhdPath $VhdPath -PartitionNumber $PartitionNumber
+    $currentLetter = Get-VhdDriveLetter -VhdPath $VhdPath -PartitionNumber $PartitionNumber -PartitionRole $PartitionRole
     if ($currentLetter -eq $normalizedLetter) {
         return $normalizedLetter
     }
@@ -262,7 +328,7 @@ function Set-VhdDriveLetter {
         Add-PartitionAccessPath -DiskNumber $partition.DiskNumber -PartitionNumber $partition.PartitionNumber -AccessPath (Get-DriveRoot -DriveLetter $normalizedLetter) -ErrorAction Stop | Out-Null
     }
 
-    $updatedLetter = Get-VhdDriveLetter -VhdPath $VhdPath -PartitionNumber $PartitionNumber -RetryCount 6 -RetryDelayMilliseconds 250
+    $updatedLetter = Get-VhdDriveLetter -VhdPath $VhdPath -PartitionNumber $PartitionNumber -PartitionRole $PartitionRole -RetryCount 6 -RetryDelayMilliseconds 250
     if ($updatedLetter -eq $normalizedLetter -or (Test-Path -LiteralPath (Get-DriveRoot -DriveLetter $normalizedLetter))) {
         return $normalizedLetter
     }
@@ -299,7 +365,8 @@ function Mount-VhdAndAssignDriveLetter {
         [Parameter(Mandatory = $true)][string]$VhdPath,
         [Parameter(Mandatory = $true)][string[]]$PreferredLetters,
         [Parameter(Mandatory = $true)][string]$Label,
-        [int]$PartitionNumber = 1,
+        [int]$PartitionNumber = 0,
+        [string]$PartitionRole = "BasicData",
         [string[]]$ExcludedLetters = @()
     )
 
@@ -315,7 +382,7 @@ function Mount-VhdAndAssignDriveLetter {
         }
     }
 
-    $existingLetter = Get-VhdDriveLetter -VhdPath $VhdPath -PartitionNumber $PartitionNumber -RetryCount 6 -RetryDelayMilliseconds 250
+    $existingLetter = Get-VhdDriveLetter -VhdPath $VhdPath -PartitionNumber $PartitionNumber -PartitionRole $PartitionRole -RetryCount 6 -RetryDelayMilliseconds 250
     if ((-not [string]::IsNullOrWhiteSpace($existingLetter)) -and (-not $excluded.ContainsKey($existingLetter))) {
         Write-BuildLog "$Label icin mevcut surucu harfi yeniden kullaniliyor: $existingLetter"
         return $existingLetter
@@ -343,7 +410,7 @@ function Mount-VhdAndAssignDriveLetter {
         }
 
         try {
-            Set-VhdDriveLetter -VhdPath $VhdPath -DriveLetter $letter -Label $Label -PartitionNumber $PartitionNumber | Out-Null
+            Set-VhdDriveLetter -VhdPath $VhdPath -DriveLetter $letter -Label $Label -PartitionNumber $PartitionNumber -PartitionRole $PartitionRole | Out-Null
         }
         catch {
             Write-BuildLog "$Label icin surucu harfi atanamadi: $letter | $($_.Exception.Message)" "WARN"
@@ -385,7 +452,8 @@ function Ensure-VhdMounted {
         [Parameter(Mandatory = $true)][string]$VhdPath,
         [Parameter(Mandatory = $true)][string]$DriveLetter,
         [Parameter(Mandatory = $true)][string]$Label,
-        [int]$PartitionNumber = 1
+        [int]$PartitionNumber = 0,
+        [string]$PartitionRole = "BasicData"
     )
 
     if (Test-Path -LiteralPath ($DriveLetter + ":\\")) {
@@ -398,7 +466,7 @@ function Ensure-VhdMounted {
         "attach vdisk noerr"
     )
 
-    Set-VhdDriveLetter -VhdPath $VhdPath -DriveLetter $DriveLetter -Label $Label -PartitionNumber $PartitionNumber | Out-Null
+    Set-VhdDriveLetter -VhdPath $VhdPath -DriveLetter $DriveLetter -Label $Label -PartitionNumber $PartitionNumber -PartitionRole $PartitionRole | Out-Null
 
     if (-not (Test-Path -LiteralPath ($DriveLetter + ":\\"))) {
         throw "$Label surucusu yeniden baglanamadi: $DriveLetter"
@@ -721,7 +789,7 @@ try {
         "format quick fs=ntfs label=""CigerTool"""
     )
 
-    $workspaceDriveLetter = Mount-VhdAndAssignDriveLetter -VhdPath $workspaceVhdPath -PreferredLetters @("W", "V", "U", "T", "R", "Q", "P", "O") -Label "Workspace VHD"
+    $workspaceDriveLetter = Mount-VhdAndAssignDriveLetter -VhdPath $workspaceVhdPath -PreferredLetters @("W", "V", "U", "T", "R", "Q", "P", "O") -PartitionRole "BasicData" -Label "Workspace VHD"
     $workspaceDriveRoot = Get-DriveRoot -DriveLetter $workspaceDriveLetter
 
     & dism.exe /Apply-Image /ImageFile:$installImage /Index:$ImageIndex /ApplyDir:$workspaceDriveRoot | Out-Null
@@ -734,7 +802,7 @@ try {
     & dism.exe /Image:$workspaceDriveRoot /Set-TimeZone:"Turkey Standard Time" | Out-Null
     Write-BuildLog "Offline locale ve timezone ayarlari uygulandi."
 
-    Ensure-VhdMounted -VhdPath $workspaceVhdPath -DriveLetter $workspaceDriveLetter -Label "Workspace VHD"
+    Ensure-VhdMounted -VhdPath $workspaceVhdPath -DriveLetter $workspaceDriveLetter -PartitionRole "BasicData" -Label "Workspace VHD"
     Copy-Item -LiteralPath $unattendSource -Destination (Join-Path $workspaceDriveRoot "Windows\Panther\Unattend.xml") -Force
     Copy-DirectoryContents -SourcePath $workspaceStartupSource -DestinationPath (Join-Path $workspaceDriveRoot "Program Files\CigerToolWorkspace\startup") -Description "workspace startup runtime"
     if (Test-Path -LiteralPath $appSourceRoot) {
@@ -754,11 +822,11 @@ try {
         "format quick fs=fat32 label=""SYSTEM"""
     )
 
-    $efiDriveLetter = Mount-VhdAndAssignDriveLetter -VhdPath $efiVhdPath -PreferredLetters @("S", "Y", "X", "Z", "R", "Q", "P", "O") -ExcludedLetters @($workspaceDriveLetter) -Label "EFI VHD"
+    $efiDriveLetter = Mount-VhdAndAssignDriveLetter -VhdPath $efiVhdPath -PreferredLetters @("S", "Y", "X", "Z", "R", "Q", "P", "O") -PartitionRole "EfiSystem" -ExcludedLetters @($workspaceDriveLetter) -Label "EFI VHD"
     $efiDriveRoot = Get-DriveRoot -DriveLetter $efiDriveLetter
 
-    Ensure-VhdMounted -VhdPath $workspaceVhdPath -DriveLetter $workspaceDriveLetter -Label "Workspace VHD"
-    Ensure-VhdMounted -VhdPath $efiVhdPath -DriveLetter $efiDriveLetter -Label "EFI VHD"
+    Ensure-VhdMounted -VhdPath $workspaceVhdPath -DriveLetter $workspaceDriveLetter -PartitionRole "BasicData" -Label "Workspace VHD"
+    Ensure-VhdMounted -VhdPath $efiVhdPath -DriveLetter $efiDriveLetter -PartitionRole "EfiSystem" -Label "EFI VHD"
     & bcdboot (Join-Path $workspaceDriveRoot "Windows") /s ($efiDriveLetter + ":") /f UEFI /d | Out-Null
     if ($LASTEXITCODE -ne 0) {
         throw "bcdboot basarisiz oldu."
@@ -775,7 +843,7 @@ try {
     & bcdedit /store $bcdStore /set "{bootmgr}" timeout 3 | Out-Null
     Write-BuildLog "BCD store workspace VHDX native boot icin guncellendi."
 
-    Ensure-VhdMounted -VhdPath $efiVhdPath -DriveLetter $efiDriveLetter -Label "EFI VHD"
+    Ensure-VhdMounted -VhdPath $efiVhdPath -DriveLetter $efiDriveLetter -PartitionRole "EfiSystem" -Label "EFI VHD"
     Ensure-Directory -PathValue (Join-Path $usbLayoutRoot "EFI")
     Ensure-Directory -PathValue (Join-Path $usbLayoutRoot "Boot")
     Copy-DirectoryContents -SourcePath (Join-Path $efiDriveRoot "EFI") -DestinationPath (Join-Path $usbLayoutRoot "EFI") -Description "USB EFI layout"
