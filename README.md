@@ -1,13 +1,13 @@
 # CigerTool by hkannq
 
-CigerTool, tek bir USB ile iki isi birden yapan hazir calisma alani urunudur:
+CigerTool, tek bir USB ile iki işi birden yapan hazır çalışma alanı ürünüdür:
 
 - `CigerTool Workspace`
-  Hazir Windows workspace'i dogrudan masaustune acar ve `CigerTool` uygulamasini otomatik baslatir.
+  Hazır Windows workspace'ini doğrudan masaüstüne açar ve `CigerTool` uygulamasını otomatik başlatır.
 - `ISO Library`
-  USB'ye sonradan birakilan ISO dosyalarini acilis menusunde gosterir.
+  USB'ye sonradan bırakılan ISO dosyalarını açılış menüsünde gösterir.
 
-Bu repo artik WinPE-first veya Windows Setup-first mantigi kullanmaz. Ana urun davranisi, hazirlanmis workspace imaji uzerinden kurulur.
+Bu repo artık WinPE-first veya Windows Setup-first mantığı kullanmaz. Ana ürün davranışı, hazırlanmış workspace imajı üzerinden kurulur.
 
 ## Girdi
 
@@ -17,51 +17,53 @@ Zorunlu yerel kaynak dosya:
 
 Bu dosya:
 
-- build icin yerel girdidir
+- build için yerel girdidir
 - git'e commit edilmez
-- `.gitignore` tarafindan korunur
-- manuel release calistirilmadan once repo working tree icinde bulunmalidir
+- `.gitignore` tarafından korunur
 
 ## Build
 
-Tek resmi build girisi:
+Tek resmi build girişi:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\build\build_cigertool_release.ps1
 ```
 
-Sadece plan ve staging dogrulamasi icin:
+Sadece plan ve staging doğrulaması için:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\build\build_cigertool_release.ps1 -PlanOnly
 ```
 
-Gercek artifact uretimi icin yonetici yetkisi gerekir. Bunun nedeni `diskpart`, `DISM` ve `bcdboot` ile VHDX hazirlama adimlarinin yukseltilmis hak istemesidir.
+Gerçek artifact üretimi için yönetici yetkisi gerekir. Bunun nedeni `diskpart`, `DISM` ve `bcdboot` ile VHDX hazırlama adımlarının yükseltilmiş hak istemesidir.
 
 ## GitHub Actions
 
-- `push` akisi sadece validation calistirir
-- `push` uzerinde gercek ISO build yapilmaz
-- `workflow_dispatch` + `build_mode=release` gercek ISO build yoludur
-- bu release modu, repo working tree icindeki yerel `inputs/workspace/install.wim` dosyasini kullanir
+- `push` akışı sadece validation çalıştırır
+- `push` üzerinde gerçek ISO build yapılmaz
+- `workflow_dispatch` + `build_mode=release` gerçek ISO build yoludur
+- release modu self-hosted Windows runner üzerinde çalışır
+- release işi kalıcı yerel repo kopyasını kullanır:
+  - `C:\actions-runner\cigertool-release\repo`
 
-Manual Actions release oncesi:
+Manual Actions release öncesi:
 
-1. `inputs/workspace/install.wim` dosyasini repo working tree icine yerlestir
-2. self-hosted Windows runner uzerinden `Build CigerTool Release` workflow'unu calistir
-3. `build_mode=release` sec
+1. Self-hosted runner makinesinde şu klasöre `install.wim` koy:
+   - `C:\actions-runner\cigertool-release\repo\inputs\workspace\install.wim`
+2. Aynı makinede Python 3.12+ kurulu ve `python` komutu PATH içinde olsun
+3. GitHub Actions üzerinden `Build CigerTool Release` workflow'unu `build_mode=release` ile çalıştır
 
-## Ana Cikti
+## Ana Çıktı
 
 Birincil artifact:
 
 - `artifacts/CigerTool-Workspace.iso`
 
-GitHub Actions artifact adi:
+GitHub Actions artifact adı:
 
 - `CigerTool-Workspace`
 
-Ikincil artifact'ler:
+İkincil artifact'ler:
 
 - `artifacts/CigerTool-Workspace.iso.sha256`
 - `artifacts/CigerTool-Workspace-debug.zip`
@@ -69,53 +71,53 @@ Ikincil artifact'ler:
 
 ## ISO Library
 
-Repo icindeki kaynak klasor:
+Repo içindeki kaynak klasör:
 
 - `iso-library/windows`
 - `iso-library/linux`
 - `iso-library/tools`
 
-Build sirasinda bu icerik USB duzeninde su koklere tasinir:
+Build sırasında bu içerik USB düzeninde şu köklere taşınır:
 
 - `/isos/windows`
 - `/isos/linux`
 - `/isos/tools`
 
-Son kullanici USB'yi yazdiktan sonra yeni ISO'lari dogrudan bu `/isos/*` dizinlerine birakabilir. Acilis menusu her boot sirasinda bu dizinleri yeniden tarar.
+Son kullanıcı USB'yi yazdıktan sonra yeni ISO'ları doğrudan bu `/isos/*` dizinlerine bırakabilir. Açılış menüsü her boot sırasında bu dizinleri yeniden tarar.
 
-## Klasor Ozeti
+## Klasör Özeti
 
 - `build/`
-  Final release build girisi ve ic yardimci scriptler
+  Final release build girişi ve iç yardımcı scriptler
 - `boot/`
-  GRUB tabanli acilis katmani ve boot asset'leri
+  GRUB tabanlı açılış katmanı ve boot asset'leri
 - `workspace/`
-  Hazir Windows workspace startup, unattend ve payload katmani
+  Hazır Windows workspace startup, unattend ve payload katmanı
 - `cigertool/`
   Ana uygulama kodu ve runtime operasyon scriptleri
 - `iso-library/`
-  Build kaynak ISO kutuphanesi
+  Build kaynak ISO kütüphanesi
 - `tools/`
-  USB'ye tasinacak portable araclar
+  USB'ye taşınacak portable araçlar
 - `docs/`
   Mimari, boot, release ve durum belgeleri
 - `inputs/`
   Build girdileri
 
-## Urun Davranisi
+## Ürün Davranışı
 
-Acilis menusunde varsayilan giris:
+Açılış menüsünde varsayılan giriş:
 
 - `CigerTool Workspace`
 
-Ikinci ana giris:
+İkinci ana giriş:
 
 - `ISO Library`
 
-`CigerTool Workspace` hedef davranisi:
+`CigerTool Workspace` hedef davranışı:
 
 - Windows Setup yok
 - OOBE yok
 - parola yok
-- dogrudan masaustu
+- doğrudan masaüstü
 - `CigerTool` auto-start

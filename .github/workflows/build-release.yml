@@ -102,41 +102,76 @@ jobs:
       - Windows
       - X64
     timeout-minutes: 180
+    env:
+      SELF_HOSTED_REPO_ROOT: C:\actions-runner\cigertool-release\repo
+      GITHUB_TOKEN: ${{ github.token }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          clean: false
+      - name: Prepare local release repository
+        id: local_repo
+        shell: powershell
+        run: |
+          $repoRoot = $env:SELF_HOSTED_REPO_ROOT
+          $repoParent = Split-Path -Path $repoRoot -Parent
+          New-Item -ItemType Directory -Force -Path $repoParent | Out-Null
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+          $remoteUrl = "https://x-access-token:$env:GITHUB_TOKEN@github.com/$env:GITHUB_REPOSITORY.git"
+
+          if (-not (Test-Path -LiteralPath (Join-Path $repoRoot ".git"))) {
+            git clone $remoteUrl $repoRoot
+          } else {
+            git -C $repoRoot remote set-url origin $remoteUrl
+          }
+
+          git -C $repoRoot fetch --prune origin
+          git -C $repoRoot checkout --force $env:GITHUB_SHA
+          git -C $repoRoot reset --hard $env:GITHUB_SHA
+
+          "repo_root=$repoRoot" >> $env:GITHUB_OUTPUT
+          Write-Host "Release repo root: $repoRoot"
 
       - name: Validate local workspace input
         shell: powershell
         run: |
-          New-Item -ItemType Directory -Force -Path "artifacts\logs" | Out-Null
-          if (-not (Test-Path -LiteralPath "inputs\workspace\install.wim")) {
-            throw "Release mode icin gereken yerel girdi bulunamadi: inputs\workspace\install.wim. Manual release oncesi bu dosyayi repo working tree icine yerlestirin."
+          $repoRoot = "${{ steps.local_repo.outputs.repo_root }}"
+          $workspaceWim = Join-Path $repoRoot "inputs\workspace\install.wim"
+          $logRoot = Join-Path $repoRoot "artifacts\logs"
+          New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
+          if (-not (Test-Path -LiteralPath $workspaceWim)) {
+            throw "Release mode icin gereken yerel girdi bulunamadi: $workspaceWim"
           }
-          Get-Item "inputs\workspace\install.wim" | Format-List Name,Length,LastWriteTime
-          Set-Content -Path "artifacts\logs\workspace-input.log" -Value "mode=release`nsource=local-working-tree`npath=inputs\workspace\install.wim" -Encoding utf8
+          Get-Item $workspaceWim | Format-List FullName,Length,LastWriteTime
+          Set-Content -Path (Join-Path $logRoot "workspace-input.log") -Value "mode=release`nsource=persistent-local-repo`npath=$workspaceWim" -Encoding utf8
+
+      - name: Validate local Python
+        shell: powershell
+        run: |
+          $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+          if (-not $pythonCmd) {
+            throw "Self-hosted release runner uzerinde python bulunamadi. Python 3.12+ kurun ve PATH'e ekleyin."
+          }
+          $pythonVersion = & python -c "import sys; print('.'.join(map(str, sys.version_info[:3])))"
+          if ([version]$pythonVersion -lt [version]"3.12.0") {
+            throw "Self-hosted release runner uzerindeki Python surumu yetersiz: $pythonVersion. Python 3.12+ gerekir."
+          }
+          Write-Host "Python surumu: $pythonVersion"
 
       - name: Install Python dependencies
         shell: powershell
+        working-directory: ${{ steps.local_repo.outputs.repo_root }}
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
       - name: Build release ISO
         shell: powershell
+        working-directory: ${{ steps.local_repo.outputs.repo_root }}
         run: |
           .\build\build_cigertool_release.ps1 -WorkspaceWimPath "inputs\workspace\install.wim"
 
       - name: Validate release artifacts
         shell: powershell
+        working-directory: ${{ steps.local_repo.outputs.repo_root }}
         run: |
           $requiredPaths = @(
             "artifacts\CigerTool-Workspace.iso",
@@ -156,10 +191,10 @@ jobs:
         with:
           name: CigerTool-Workspace
           path: |
-            artifacts/CigerTool-Workspace.iso
-            artifacts/CigerTool-Workspace.iso.sha256
-            artifacts/CigerTool-Workspace.release.json
-            artifacts/CigerTool-Workspace-debug.zip
+            ${{ steps.local_repo.outputs.repo_root }}\artifacts\CigerTool-Workspace.iso
+            ${{ steps.local_repo.outputs.repo_root }}\artifacts\CigerTool-Workspace.iso.sha256
+            ${{ steps.local_repo.outputs.repo_root }}\artifacts\CigerTool-Workspace.release.json
+            ${{ steps.local_repo.outputs.repo_root }}\artifacts\CigerTool-Workspace-debug.zip
           if-no-files-found: error
           retention-days: 30
 
@@ -168,6 +203,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cigertool-build-logs
-          path: artifacts/logs
+          path: ${{ steps.local_repo.outputs.repo_root }}\artifacts\logs
           if-no-files-found: warn
           retention-days: 30

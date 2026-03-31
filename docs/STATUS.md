@@ -3,34 +3,36 @@
 ## Durum
 
 - Tarih: 2026-03-31
-- Asama: Release workflow architecture fix
-- Sonuc: push ve manual release akisları ayrildi; release modu artik sadece yerel `inputs/workspace/install.wim` kullanir
+- Aşama: Self-hosted release workflow hardening
+- Sonuç: Release job artık GitHub-hosted araç kurulumlarına ve `_work` checkout klasörüne bağımlı değil
 
 ## Tamamlananlar
 
-- `push` akisi validation/plan only olarak korundu
-- `workflow_dispatch` + `build_mode=release` gercek ISO build yolu olarak ayrildi
-- release workflow icindeki `workspace_wim_url` ve URL indirme mantigi kaldirildi
-- manual release artik yalnizca repo working tree icindeki `inputs/workspace/install.wim` dosyasini kabul ediyor
-- `.gitignore` yerel WIM girdisini acikca koruyacak sekilde guncellendi
-- README ve release dokumanlari yeni akisla hizalandi
+- `push` akışı validation/plan only olarak korundu
+- `workflow_dispatch` + `build_mode=release` gerçek ISO build yolu olarak ayrıldı
+- release workflow içindeki `workspace_wim_url` ve URL indirme mantığı kaldırıldı
+- self-hosted release job, kalıcı yerel repo kökü `C:\actions-runner\cigertool-release\repo` üzerinden çalışacak şekilde güncellendi
+- release job içinden `actions/setup-python` kaldırıldı; bunun yerine yerel Python 3.12+ doğrulaması eklendi
+- release job için GitHub token, kalıcı repo güncellemesi yapabilmesi amacıyla açıkça job environment'ına verildi
+- README ve release dokümanları kalıcı yerel repo modeliyle hizalandı
 
-## Ana Build Girisi
+## Ana Build Girişi
 
 - `build/build_cigertool_release.ps1`
 
-Plan dogrulama:
+Plan doğrulama:
 
 - `build/build_cigertool_release.ps1 -PlanOnly`
 
-## Release Ozet
+## Release Özeti
 
 - `push` -> `cigertool-release-plan`
 - `workflow_dispatch` + `build_mode=release` -> `CigerTool-Workspace`
 
 ## Kalan Riskler
 
-- Gercek full build hala yonetici hakli Windows ortami ister
-- Manual release akisinin calismasi icin self-hosted Windows runner gerekir
-- Self-hosted runner working tree icinde `inputs/workspace/install.wim` dosyasi release oncesi hazir olmalidir
-- Gercek USB/VM boot smoke testi ayrica yapilmalidir
+- Gerçek full build hâlâ yönetici haklı Windows ortamı ister
+- Manual release akışının çalışması için self-hosted Windows runner gerekir
+- `C:\actions-runner\cigertool-release\repo\inputs\workspace\install.wim` dosyası release öncesi hazır olmalıdır
+- Self-hosted runner üzerinde Python 3.12+ önceden kurulmuş olmalıdır
+- Gerçek USB/VM boot smoke testi ayrıca yapılmalıdır
