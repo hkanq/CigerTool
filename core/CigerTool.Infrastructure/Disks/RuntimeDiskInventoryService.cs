@@ -1,5 +1,6 @@
 using System.Management;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using CigerTool.Application.Contracts;
 using CigerTool.Application.Models;
 using CigerTool.Domain.Enums;
@@ -8,62 +9,125 @@ using CigerTool.Infrastructure.Common;
 
 namespace CigerTool.Infrastructure.Disks;
 
+[SupportedOSPlatform("windows")]
 public sealed class RuntimeDiskInventoryService(IOperationLogService operationLogService) : IDiskInventoryService
 {
+    private const string StorageNamespace = @"ROOT\Microsoft\Windows\Storage";
+
     public DiskWorkspaceSnapshot GetSnapshot()
     {
         var disks = GetCurrentDisks();
-        var systemDrive = System.Environment.GetEnvironmentVariable("SystemDrive") ?? "C:";
+        var systemDrive = global::System.Environment.GetEnvironmentVariable("SystemDrive") ?? "C:";
         var systemDisk = disks.FirstOrDefault(disk => disk.IsSystemVolume);
         var fixedCount = disks.Count(disk => !disk.IsRemovable);
         var removableCount = disks.Count(disk => disk.IsRemovable);
-        var warningCount = disks.Count(disk => !string.Equals(disk.WarningSummary, "Hazır", StringComparison.OrdinalIgnoreCase));
+        var attentionCount = disks.Count(disk => !string.Equals(disk.HealthLabel, "Sağlıklı", StringComparison.OrdinalIgnoreCase));
 
         return new DiskWorkspaceSnapshot(
             Heading: "Diskler ve Sağlık",
-            Summary: "Bağlı sürücüleri, kapasite durumunu, bağlantı tipini ve seçim öncesi dikkat gerektiren uyarıları burada görebilirsiniz.",
+            Summary: "Bağlı sürücülerin marka, bağlantı tipi, medya sınıfı, sağlık özeti ve kapasite durumunu buradan izleyebilirsiniz.",
             System: new SystemSummary(
-                MachineName: System.Environment.MachineName,
+                MachineName: global::System.Environment.MachineName,
                 OperatingSystem: RuntimeInformation.OSDescription,
                 Architecture: RuntimeInformation.OSArchitecture.ToString(),
                 Framework: RuntimeInformation.FrameworkDescription,
-                CurrentUser: System.Environment.UserName,
+                CurrentUser: global::System.Environment.UserName,
                 SystemDrive: systemDrive,
-                UptimeLabel: ByteSizeFormatter.FormatUptime(TimeSpan.FromMilliseconds(System.Environment.TickCount64))),
+                UptimeLabel: ByteSizeFormatter.FormatUptime(TimeSpan.FromMilliseconds(global::System.Environment.TickCount64))),
             Metrics:
             [
-                new CardMetric("Toplam sürücü", disks.Count.ToString(), "İşlem ekranlarında seçilebilir sürücüler."),
-                new CardMetric("Dahili / sabit", fixedCount.ToString(), "Genellikle sistem veya veri amaçlı kullanılan sürücüler."),
-                new CardMetric("Çıkarılabilir", removableCount.ToString(), "USB bellek veya taşınabilir diskler."),
-                new CardMetric("Dikkat gerektiren", warningCount.ToString(), "Düşük boş alan veya sınırlı erişim gibi notlar içeren sürücüler."),
+                new CardMetric("Toplam sürücü", disks.Count.ToString(), "Bağlı ve erişilebilir sürücüler."),
+                new CardMetric("Dahili / sabit", fixedCount.ToString(), "SATA, NVMe veya diğer dahili depolama aygıtları."),
+                new CardMetric("Çıkarılabilir", removableCount.ToString(), "USB bellek ve harici diskler."),
+                new CardMetric("İzlenecek durum", attentionCount.ToString(), "Sağlık veya boş alan nedeniyle dikkat isteyen sürücüler."),
                 new CardMetric(
                     "Sistem sürücüsü",
                     systemDisk?.DriveLetter ?? systemDrive,
-                    systemDisk is null ? "Sistem sürücüsü ayrıntısı okunamadı." : $"{systemDisk.FreeLabel} boş alan")
+                    systemDisk is null
+                        ? "Sistem sürücüsü ayrıntısı okunamadı."
+                        : $"{systemDisk.MediaType} · {systemDisk.FreeLabel} boş")
             ],
             Disks: disks,
             Notes:
             [
-                "Sağlık özeti; boş alan, Windows durum bilgisi ve erişim koşullarına göre oluşturulur.",
-                "Derin SMART ve üreticiye özel telemetri bu sürümde tam kapsamlı değildir.",
-                "Ham kopya ve ham imaj alma için yönetici yetkisi gerekir."
+                "Sağlık özeti Windows depolama durumu, operasyon durumu ve boş alan bilgisiyle oluşturulur.",
+                "SSD / HDD / USB bellek sınıfı model, bus türü ve depolama telemetrisi birlikte değerlendirilerek gösterilir.",
+                "Performans testi seçilen sürücü üzerinde geçici test dosyasıyla yapılır; özellikle sistem sürücüsünde arka plan yükü sonucu etkileyebilir."
             ]);
     }
 
     public IReadOnlyList<DiskSummary> GetCurrentDisks()
     {
-        var systemDrive = (System.Environment.GetEnvironmentVariable("SystemDrive") ?? "C:").TrimEnd('\\');
-        var mappings = TryBuildDriveMappings();
-        var disks = new List<DiskSummary>();
+        var systemDrive = (global::System.Environment.GetEnvironmentVariable("SystemDrive") ?? "C:").TrimEnd('\\');
+        var storageRecords = QueryStorageDiskRecords();
+        var physicalRecords = QueryPhysicalDiskRecords();
+        var mappings = QueryDriveMappings(systemDrive, storageRecords, physicalRecords);
+
+        return mappings
+            .Select(mapping => ToDiskSummary(mapping, systemDrive))
+            .OrderByDescending(disk => disk.IsSystemVolume)
+            .ThenBy(disk => disk.IsRemovable)
+            .ThenBy(disk => disk.DriveLetter)
+            .ToArray();
+    }
+
+    public DiskSummary? FindById(string id)
+    {
+        return GetCurrentDisks().FirstOrDefault(disk => string.Equals(disk.Id, id, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private DiskSummary ToDiskSummary(DriveMapping mapping, string systemDrive)
+    {
+        var totalBytes = mapping.TotalBytes;
+        var freeBytes = mapping.FreeBytes;
+        var usedBytes = Math.Max(0, totalBytes - freeBytes);
+        var usagePercent = totalBytes <= 0 ? 0 : (int)Math.Round((double)usedBytes / totalBytes * 100d, MidpointRounding.AwayFromZero);
+        var isSystemVolume = string.Equals(mapping.DriveLetter, systemDrive, StringComparison.OrdinalIgnoreCase);
+        var connectionType = ResolveConnectionType(mapping.BusTypeLabel, mapping.InterfaceType, mapping.IsRemovable);
+        var mediaClass = ResolveMediaClass(mapping);
+        var deviceModel = BuildDeviceModel(mapping.Brand, mapping.Model);
+        var warningSummary = BuildWarningSummary(mapping, isSystemVolume, freeBytes, totalBytes, mediaClass);
+        var healthLabel = BuildHealthLabel(mapping, warningSummary);
+        var displayName = string.IsNullOrWhiteSpace(mapping.VolumeLabel)
+            ? mapping.DriveLetter
+            : $"{mapping.DriveLetter} - {mapping.VolumeLabel}";
+
+        return new DiskSummary(
+            Id: mapping.DriveLetter,
+            Name: displayName,
+            DriveLetter: mapping.DriveLetter,
+            FileSystem: mapping.FileSystem,
+            ConnectionType: connectionType,
+            CapacityLabel: ByteSizeFormatter.Format(totalBytes),
+            UsedLabel: ByteSizeFormatter.Format(usedBytes),
+            FreeLabel: ByteSizeFormatter.Format(freeBytes),
+            LayoutLabel: isSystemVolume ? "Sistem sürücüsü" : "Veri sürücüsü",
+            HealthLabel: healthLabel,
+            TotalBytes: totalBytes,
+            UsedBytes: usedBytes,
+            FreeBytes: freeBytes,
+            IsSystemVolume: isSystemVolume,
+            IsReady: true,
+            DeviceModel: deviceModel,
+            BusType: mapping.BusTypeLabel,
+            MediaType: mediaClass,
+            IdentityLabel: BuildIdentityLabel(mapping, mediaClass, connectionType),
+            WarningSummary: warningSummary,
+            UsagePercent: usagePercent,
+            IsRemovable: mapping.IsRemovable,
+            SupportsRawAccess: RawVolumeAccessScope.IsAdministrator());
+    }
+
+    private IReadOnlyList<DriveMapping> QueryDriveMappings(
+        string systemDrive,
+        IReadOnlyDictionary<int, StorageDiskRecord> storageRecords,
+        IReadOnlyList<PhysicalDiskRecord> physicalRecords)
+    {
+        var result = new List<DriveMapping>();
 
         foreach (var drive in DriveInfo.GetDrives())
         {
-            if (!drive.IsReady)
-            {
-                continue;
-            }
-
-            if (drive.DriveType is not (DriveType.Fixed or DriveType.Removable))
+            if (!drive.IsReady || drive.DriveType is not (DriveType.Fixed or DriveType.Removable))
             {
                 continue;
             }
@@ -71,41 +135,31 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
             try
             {
                 var driveLetter = drive.Name.TrimEnd('\\');
-                var totalBytes = drive.TotalSize;
-                var freeBytes = drive.AvailableFreeSpace;
-                var usedBytes = Math.Max(0, totalBytes - freeBytes);
-                var usagePercent = totalBytes == 0 ? 0 : (int)Math.Round((double)usedBytes / totalBytes * 100d, MidpointRounding.AwayFromZero);
-                var mapping = mappings.FirstOrDefault(item => string.Equals(item.DriveLetter, driveLetter, StringComparison.OrdinalIgnoreCase));
-                var isSystemVolume = string.Equals(driveLetter, systemDrive, StringComparison.OrdinalIgnoreCase);
-                var connectionType = MapConnectionType(drive.DriveType, mapping?.InterfaceType);
-                var warningSummary = BuildWarningSummary(freeBytes, totalBytes, isSystemVolume, mapping);
-                var healthLabel = BuildHealthLabel(warningSummary, mapping?.Status);
-                var displayName = string.IsNullOrWhiteSpace(drive.VolumeLabel) ? driveLetter : $"{driveLetter} - {drive.VolumeLabel}";
+                var win32Record = FindWin32RecordForDrive(driveLetter);
+                if (win32Record is null)
+                {
+                    continue;
+                }
 
-                disks.Add(new DiskSummary(
-                    Id: driveLetter,
-                    Name: displayName,
+                storageRecords.TryGetValue(win32Record.Index, out var storageRecord);
+                var physicalRecord = MatchPhysicalRecord(win32Record, physicalRecords);
+
+                result.Add(new DriveMapping(
                     DriveLetter: driveLetter,
+                    VolumeLabel: SafeRead(() => drive.VolumeLabel, string.Empty),
                     FileSystem: SafeRead(() => drive.DriveFormat, "Bilinmiyor"),
-                    ConnectionType: connectionType,
-                    CapacityLabel: ByteSizeFormatter.Format(totalBytes),
-                    UsedLabel: ByteSizeFormatter.Format(usedBytes),
-                    FreeLabel: ByteSizeFormatter.Format(freeBytes),
-                    LayoutLabel: isSystemVolume ? "Sistem sürücüsü" : "Veri sürücüsü",
-                    HealthLabel: healthLabel,
-                    TotalBytes: totalBytes,
-                    UsedBytes: usedBytes,
-                    FreeBytes: freeBytes,
-                    IsSystemVolume: isSystemVolume,
-                    IsReady: true,
-                    DeviceModel: mapping?.Model ?? "Bilinmeyen aygıt",
-                    BusType: mapping?.InterfaceType ?? (drive.DriveType == DriveType.Removable ? "USB" : "Dahili"),
-                    MediaType: mapping?.MediaType ?? (drive.DriveType == DriveType.Removable ? "Çıkarılabilir" : "Sabit"),
-                    IdentityLabel: BuildIdentityLabel(mapping, connectionType),
-                    WarningSummary: warningSummary,
-                    UsagePercent: usagePercent,
-                    IsRemovable: drive.DriveType == DriveType.Removable,
-                    SupportsRawAccess: RawVolumeAccessScope.IsAdministrator()));
+                    TotalBytes: drive.TotalSize,
+                    FreeBytes: drive.AvailableFreeSpace,
+                    Model: FirstNonEmpty(storageRecord?.FriendlyName, win32Record.Model, physicalRecord?.FriendlyName, "Bilinmeyen aygıt"),
+                    Brand: ExtractBrand(FirstNonEmpty(storageRecord?.FriendlyName, win32Record.Model, physicalRecord?.FriendlyName)),
+                    InterfaceType: win32Record.InterfaceType,
+                    BusTypeLabel: ResolveBusTypeLabel(storageRecord?.BusTypeCode, win32Record.InterfaceType),
+                    MediaType: FirstNonEmpty(physicalRecord?.MediaTypeLabel, win32Record.MediaType, storageRecord?.HealthLabel),
+                    Status: FirstNonEmpty(storageRecord?.HealthLabel, win32Record.Status, physicalRecord?.HealthLabel, "Bilinmiyor"),
+                    OperationalStatus: FirstNonEmpty(storageRecord?.OperationalStatusLabel, physicalRecord?.OperationalStatusLabel, "Bilinmiyor"),
+                    IsRemovable: drive.DriveType == DriveType.Removable || ResolveBusTypeLabel(storageRecord?.BusTypeCode, win32Record.InterfaceType).Contains("USB", StringComparison.OrdinalIgnoreCase),
+                    Index: win32Record.Index,
+                    IsBootOrSystem: storageRecord?.IsSystem == true || storageRecord?.IsBoot == true || string.Equals(driveLetter, systemDrive, StringComparison.OrdinalIgnoreCase)));
             }
             catch (Exception ex)
             {
@@ -122,27 +176,17 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
             }
         }
 
-        return disks
-            .OrderByDescending(disk => disk.IsSystemVolume)
-            .ThenBy(disk => disk.IsRemovable)
-            .ThenBy(disk => disk.DriveLetter)
-            .ToArray();
+        return result;
     }
 
-    public DiskSummary? FindById(string id)
+    private static Win32DiskRecord? FindWin32RecordForDrive(string driveLetter)
     {
-        return GetCurrentDisks().FirstOrDefault(disk => string.Equals(disk.Id, id, StringComparison.OrdinalIgnoreCase));
-    }
+        using var diskSearcher = new ManagementObjectSearcher(
+            "SELECT DeviceID, Model, InterfaceType, MediaType, Index, Status FROM Win32_DiskDrive");
 
-    private static IReadOnlyList<DriveMapping> TryBuildDriveMappings()
-    {
-        try
+        foreach (ManagementObject disk in diskSearcher.Get())
         {
-            using var searcher = new ManagementObjectSearcher("SELECT DeviceID, Model, InterfaceType, MediaType, Index, Status FROM Win32_DiskDrive");
-            using var results = searcher.Get();
-            var mappings = new List<DriveMapping>();
-
-            foreach (ManagementObject disk in results)
+            using (disk)
             {
                 var diskDeviceId = disk["DeviceID"]?.ToString();
                 if (string.IsNullOrWhiteSpace(diskDeviceId))
@@ -152,36 +196,108 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
 
                 var query = $"ASSOCIATORS OF {{Win32_DiskDrive.DeviceID='{EscapeWmiPath(diskDeviceId)}'}} WHERE AssocClass = Win32_DiskDriveToDiskPartition";
                 using var partitions = new ManagementObjectSearcher(query).Get();
+
                 foreach (ManagementObject partition in partitions)
                 {
-                    var partitionId = partition["DeviceID"]?.ToString();
-                    if (string.IsNullOrWhiteSpace(partitionId))
+                    using (partition)
                     {
-                        continue;
-                    }
-
-                    var logicalQuery = $"ASSOCIATORS OF {{Win32_DiskPartition.DeviceID='{EscapeWmiPath(partitionId)}'}} WHERE AssocClass = Win32_LogicalDiskToPartition";
-                    using var logicalDisks = new ManagementObjectSearcher(logicalQuery).Get();
-                    foreach (ManagementObject logicalDisk in logicalDisks)
-                    {
-                        var driveLetter = logicalDisk["DeviceID"]?.ToString();
-                        if (string.IsNullOrWhiteSpace(driveLetter))
+                        var partitionId = partition["DeviceID"]?.ToString();
+                        if (string.IsNullOrWhiteSpace(partitionId))
                         {
                             continue;
                         }
 
-                        mappings.Add(new DriveMapping(
-                            DriveLetter: driveLetter,
-                            Model: disk["Model"]?.ToString() ?? "Bilinmeyen aygıt",
-                            InterfaceType: disk["InterfaceType"]?.ToString() ?? "Bilinmiyor",
-                            MediaType: disk["MediaType"]?.ToString() ?? "Bilinmiyor",
-                            Status: disk["Status"]?.ToString() ?? "Bilinmiyor",
-                            Index: disk["Index"]?.ToString() ?? string.Empty));
+                        var logicalQuery = $"ASSOCIATORS OF {{Win32_DiskPartition.DeviceID='{EscapeWmiPath(partitionId)}'}} WHERE AssocClass = Win32_LogicalDiskToPartition";
+                        using var logicalDisks = new ManagementObjectSearcher(logicalQuery).Get();
+
+                        foreach (ManagementObject logicalDisk in logicalDisks)
+                        {
+                            using (logicalDisk)
+                            {
+                                var logicalDrive = logicalDisk["DeviceID"]?.ToString();
+                                if (!string.Equals(logicalDrive, driveLetter, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    continue;
+                                }
+
+                                return new Win32DiskRecord(
+                                    Index: Convert.ToInt32(disk["Index"] ?? -1),
+                                    Model: disk["Model"]?.ToString() ?? "Bilinmeyen aygıt",
+                                    InterfaceType: disk["InterfaceType"]?.ToString() ?? "Bilinmiyor",
+                                    MediaType: disk["MediaType"]?.ToString() ?? "Bilinmiyor",
+                                    Status: disk["Status"]?.ToString() ?? "Bilinmiyor");
+                            }
+                        }
                     }
                 }
             }
+        }
 
-            return mappings;
+        return null;
+    }
+
+    private static IReadOnlyDictionary<int, StorageDiskRecord> QueryStorageDiskRecords()
+    {
+        try
+        {
+            var result = new Dictionary<int, StorageDiskRecord>();
+            using var searcher = new ManagementObjectSearcher(
+                StorageNamespace,
+                "SELECT Number, FriendlyName, Model, BusType, HealthStatus, OperationalStatus, IsBoot, IsSystem FROM MSFT_Disk");
+
+            foreach (ManagementObject disk in searcher.Get())
+            {
+                using (disk)
+                {
+                    var number = Convert.ToInt32(disk["Number"] ?? -1);
+                    if (number < 0)
+                    {
+                        continue;
+                    }
+
+                    var busTypeCode = Convert.ToInt32(disk["BusType"] ?? 0);
+                    result[number] = new StorageDiskRecord(
+                        Number: number,
+                        FriendlyName: FirstNonEmpty(disk["FriendlyName"]?.ToString(), disk["Model"]?.ToString()),
+                        BusTypeCode: busTypeCode,
+                        HealthLabel: ResolveStorageHealthLabel(Convert.ToInt32(disk["HealthStatus"] ?? 0)),
+                        OperationalStatusLabel: ResolveOperationalStatusLabel(disk["OperationalStatus"]),
+                        IsBoot: Convert.ToBoolean(disk["IsBoot"] ?? false),
+                        IsSystem: Convert.ToBoolean(disk["IsSystem"] ?? false));
+                }
+            }
+
+            return result;
+        }
+        catch
+        {
+            return new Dictionary<int, StorageDiskRecord>();
+        }
+    }
+
+    private static IReadOnlyList<PhysicalDiskRecord> QueryPhysicalDiskRecords()
+    {
+        try
+        {
+            var result = new List<PhysicalDiskRecord>();
+            using var searcher = new ManagementObjectSearcher(
+                StorageNamespace,
+                "SELECT FriendlyName, MediaType, HealthStatus, OperationalStatus, Size FROM MSFT_PhysicalDisk");
+
+            foreach (ManagementObject disk in searcher.Get())
+            {
+                using (disk)
+                {
+                    result.Add(new PhysicalDiskRecord(
+                        FriendlyName: disk["FriendlyName"]?.ToString() ?? string.Empty,
+                        MediaTypeLabel: ResolvePhysicalMediaTypeLabel(Convert.ToInt32(disk["MediaType"] ?? 0)),
+                        HealthLabel: ResolveStorageHealthLabel(Convert.ToInt32(disk["HealthStatus"] ?? 0)),
+                        OperationalStatusLabel: ResolveOperationalStatusLabel(disk["OperationalStatus"]),
+                        SizeBytes: Convert.ToInt64(disk["Size"] ?? 0L)));
+                }
+            }
+
+            return result;
         }
         catch
         {
@@ -189,83 +305,254 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
         }
     }
 
-    private static string EscapeWmiPath(string value)
+    private static PhysicalDiskRecord? MatchPhysicalRecord(Win32DiskRecord win32Record, IReadOnlyList<PhysicalDiskRecord> physicalRecords)
     {
-        return value.Replace("\\", "\\\\").Replace("'", "\\'");
+        return physicalRecords.FirstOrDefault(record =>
+                   !string.IsNullOrWhiteSpace(record.FriendlyName) &&
+                   (record.FriendlyName.Contains(win32Record.Model, StringComparison.OrdinalIgnoreCase) ||
+                    win32Record.Model.Contains(record.FriendlyName, StringComparison.OrdinalIgnoreCase)))
+               ?? physicalRecords.FirstOrDefault(record =>
+                   record.SizeBytes > 0 &&
+                   string.Equals(record.MediaTypeLabel, "SSD", StringComparison.OrdinalIgnoreCase) &&
+                   win32Record.Model.Contains("SSD", StringComparison.OrdinalIgnoreCase));
     }
 
-    private static string BuildIdentityLabel(DriveMapping? mapping, string connectionType)
+    private static string BuildWarningSummary(DriveMapping mapping, bool isSystemVolume, long freeBytes, long totalBytes, string mediaClass)
     {
-        if (mapping is null)
+        var messages = new List<string>();
+
+        if (!string.Equals(mapping.Status, "Sağlıklı", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(mapping.Status, "Bilinmiyor", StringComparison.OrdinalIgnoreCase))
         {
-            return connectionType;
+            messages.Add($"Depolama durumu: {mapping.Status}");
         }
 
-        var parts = new List<string>();
-        if (!string.IsNullOrWhiteSpace(mapping.Index))
+        if (!string.Equals(mapping.OperationalStatus, "Çalışıyor", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(mapping.OperationalStatus, "Bilinmiyor", StringComparison.OrdinalIgnoreCase))
         {
-            parts.Add($"Disk {mapping.Index}");
+            messages.Add($"Operasyon durumu: {mapping.OperationalStatus}");
         }
 
-        if (!string.IsNullOrWhiteSpace(mapping.Model))
+        if (totalBytes > 0 && (freeBytes * 100L / totalBytes) < 10)
         {
-            parts.Add(mapping.Model);
-        }
-
-        if (!string.IsNullOrWhiteSpace(mapping.InterfaceType))
-        {
-            parts.Add(mapping.InterfaceType);
-        }
-
-        return string.Join(" · ", parts.Where(part => !string.IsNullOrWhiteSpace(part)));
-    }
-
-    private static string BuildHealthLabel(string warningSummary, string? status)
-    {
-        if (!string.IsNullOrWhiteSpace(status) && !string.Equals(status, "OK", StringComparison.OrdinalIgnoreCase))
-        {
-            return "Dikkat gerekiyor";
-        }
-
-        return string.Equals(warningSummary, "Hazır", StringComparison.OrdinalIgnoreCase)
-            ? "Hazır"
-            : "İnceleme önerilir";
-    }
-
-    private static string BuildWarningSummary(long freeBytes, long totalBytes, bool isSystemVolume, DriveMapping? mapping)
-    {
-        if (!string.IsNullOrWhiteSpace(mapping?.Status) && !string.Equals(mapping.Status, "OK", StringComparison.OrdinalIgnoreCase))
-        {
-            return "Windows durum bilgisi sürücüde dikkat gerektirdiğini bildiriyor.";
-        }
-
-        if (totalBytes > 0 && freeBytes * 100L / totalBytes < 10)
-        {
-            return "Boş alan çok düşük.";
+            messages.Add("Boş alan yüzde 10'un altına düştü.");
         }
 
         if (isSystemVolume)
         {
-            return "Çalışan sistem sürücüsü.";
+            messages.Add("Çalışan sistem sürücüsü.");
         }
 
-        return "Hazır";
+        if (mediaClass.Contains("USB", StringComparison.OrdinalIgnoreCase))
+        {
+            messages.Add("Harici bağlantı nedeniyle hız ve güç koşulları değişebilir.");
+        }
+
+        return messages.Count == 0 ? "Genel durum sağlıklı görünüyor." : string.Join(" ", messages);
     }
 
-    private static string MapConnectionType(DriveType driveType, string? interfaceType) => driveType switch
+    private static string BuildHealthLabel(DriveMapping mapping, string warningSummary)
     {
-        DriveType.Fixed when string.Equals(interfaceType, "USB", StringComparison.OrdinalIgnoreCase) => "USB üzerinden bağlı",
-        DriveType.Fixed => "Dahili / sabit",
-        DriveType.Removable => "Çıkarılabilir",
-        DriveType.Network => "Ağ",
-        _ => interfaceType ?? driveType.ToString()
-    };
+        if (string.Equals(mapping.Status, "Risk", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(mapping.Status, "Kritik", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Risk var";
+        }
+
+        if (warningSummary.Contains("Boş alan", StringComparison.OrdinalIgnoreCase) ||
+            warningSummary.Contains("Harici bağlantı", StringComparison.OrdinalIgnoreCase) ||
+            warningSummary.Contains("Çalışan sistem", StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(mapping.Status, "Sağlıklı", StringComparison.OrdinalIgnoreCase))
+        {
+            return "İzlenmeli";
+        }
+
+        return "Sağlıklı";
+    }
+
+    private static string BuildIdentityLabel(DriveMapping mapping, string mediaClass, string connectionType)
+    {
+        return string.Join(" · ", new[]
+        {
+            $"Disk {mapping.Index}",
+            mapping.Brand,
+            mediaClass,
+            connectionType
+        }.Where(part => !string.IsNullOrWhiteSpace(part)));
+    }
+
+    private static string BuildDeviceModel(string brand, string model)
+    {
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            return brand;
+        }
+
+        if (model.StartsWith(brand, StringComparison.OrdinalIgnoreCase))
+        {
+            return model;
+        }
+
+        return string.IsNullOrWhiteSpace(brand) ? model : $"{brand} {model}";
+    }
+
+    private static string ResolveConnectionType(string busTypeLabel, string interfaceType, bool isRemovable)
+    {
+        if (!string.IsNullOrWhiteSpace(busTypeLabel) && !string.Equals(busTypeLabel, "Bilinmiyor", StringComparison.OrdinalIgnoreCase))
+        {
+            return busTypeLabel;
+        }
+
+        if (isRemovable)
+        {
+            return "USB";
+        }
+
+        return interfaceType;
+    }
+
+    private static string ResolveMediaClass(DriveMapping mapping)
+    {
+        var source = string.Join(' ', new[] { mapping.MediaType, mapping.Model, mapping.BusTypeLabel, mapping.InterfaceType });
+
+        if (source.Contains("NVME", StringComparison.OrdinalIgnoreCase))
+        {
+            return "NVMe SSD";
+        }
+
+        if (source.Contains("SSD", StringComparison.OrdinalIgnoreCase) || string.Equals(mapping.MediaType, "SSD", StringComparison.OrdinalIgnoreCase))
+        {
+            return mapping.IsRemovable ? "USB SSD" : "SSD";
+        }
+
+        if (source.Contains("USB", StringComparison.OrdinalIgnoreCase) && mapping.IsRemovable && mapping.TotalBytes <= 512L * 1024 * 1024 * 1024)
+        {
+            return "USB Bellek";
+        }
+
+        if (source.Contains("HDD", StringComparison.OrdinalIgnoreCase) ||
+            source.Contains("HARD DISK", StringComparison.OrdinalIgnoreCase))
+        {
+            return mapping.IsRemovable ? "USB HDD" : "HDD";
+        }
+
+        if (mapping.IsRemovable)
+        {
+            return "Harici Disk";
+        }
+
+        return "Depolama Aygıtı";
+    }
+
+    private static string ResolveBusTypeLabel(int? busTypeCode, string interfaceType)
+    {
+        if (busTypeCode is null)
+        {
+            return interfaceType;
+        }
+
+        return busTypeCode.Value switch
+        {
+            7 => "USB",
+            10 => "SAS",
+            11 => "SATA",
+            12 => "SD",
+            13 => "MMC",
+            17 => "NVMe",
+            8 => "RAID",
+            9 => "iSCSI",
+            3 => "ATA",
+            _ => string.IsNullOrWhiteSpace(interfaceType) ? "Bilinmiyor" : interfaceType
+        };
+    }
+
+    private static string ResolveStorageHealthLabel(int healthStatus)
+    {
+        return healthStatus switch
+        {
+            0 => "Sağlıklı",
+            1 => "Sağlıklı",
+            2 => "İzlenmeli",
+            3 => "Risk",
+            5 => "Risk",
+            _ => "Bilinmiyor"
+        };
+    }
+
+    private static string ResolveOperationalStatusLabel(object? rawValue)
+    {
+        if (rawValue is ushort[] values && values.Length > 0)
+        {
+            return ResolveOperationalStatusLabel(values[0]);
+        }
+
+        if (rawValue is Array array && array.Length > 0)
+        {
+            var first = array.GetValue(0);
+            if (first is not null)
+            {
+                return ResolveOperationalStatusLabel(first);
+            }
+        }
+
+        if (rawValue is null)
+        {
+            return "Bilinmiyor";
+        }
+
+        var code = Convert.ToInt32(rawValue);
+        return code switch
+        {
+            2 => "Çalışıyor",
+            3 => "Kısıtlı",
+            5 => "Bakım gerekiyor",
+            6 => "Stres altında",
+            7 => "Tahmini arıza",
+            8 => "Başlatılıyor",
+            _ => "Bilinmiyor"
+        };
+    }
+
+    private static string ResolvePhysicalMediaTypeLabel(int mediaTypeCode)
+    {
+        return mediaTypeCode switch
+        {
+            3 => "HDD",
+            4 => "SSD",
+            5 => "SCM",
+            _ => "Bilinmiyor"
+        };
+    }
+
+    private static string ExtractBrand(string model)
+    {
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            return "Bilinmeyen Marka";
+        }
+
+        var normalized = model.Trim();
+        var knownBrands = new[]
+        {
+            "Samsung", "Kingston", "Crucial", "Western Digital", "WD", "Seagate", "Toshiba",
+            "SanDisk", "Intel", "Micron", "ADATA", "Transcend", "Kioxia", "SK hynix", "Corsair", "Lexar"
+        };
+
+        var match = knownBrands.FirstOrDefault(brand => normalized.StartsWith(brand, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(match))
+        {
+            return match;
+        }
+
+        return normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "Bilinmeyen Marka";
+    }
 
     private static string SafeRead(Func<string> action, string fallback)
     {
         try
         {
-            return action();
+            var value = action();
+            return string.IsNullOrWhiteSpace(value) ? fallback : value;
         }
         catch
         {
@@ -273,11 +560,53 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
         }
     }
 
-    private sealed record DriveMapping(
-        string DriveLetter,
+    private static string FirstNonEmpty(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
+    }
+
+    private static string EscapeWmiPath(string value)
+    {
+        return value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("'", "\\'", StringComparison.Ordinal);
+    }
+
+    private sealed record Win32DiskRecord(
+        int Index,
         string Model,
         string InterfaceType,
         string MediaType,
+        string Status);
+
+    private sealed record StorageDiskRecord(
+        int Number,
+        string FriendlyName,
+        int BusTypeCode,
+        string HealthLabel,
+        string OperationalStatusLabel,
+        bool IsBoot,
+        bool IsSystem);
+
+    private sealed record PhysicalDiskRecord(
+        string FriendlyName,
+        string MediaTypeLabel,
+        string HealthLabel,
+        string OperationalStatusLabel,
+        long SizeBytes);
+
+    private sealed record DriveMapping(
+        string DriveLetter,
+        string VolumeLabel,
+        string FileSystem,
+        long TotalBytes,
+        long FreeBytes,
+        string Model,
+        string Brand,
+        string InterfaceType,
+        string BusTypeLabel,
+        string MediaType,
         string Status,
-        string Index);
+        string OperationalStatus,
+        bool IsRemovable,
+        int Index,
+        bool IsBootOrSystem);
 }

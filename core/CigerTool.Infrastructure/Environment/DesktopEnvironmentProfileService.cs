@@ -1,10 +1,12 @@
 using Microsoft.Win32;
+using System.Runtime.Versioning;
 using CigerTool.Application.Contracts;
 using CigerTool.Domain.Models;
 using CigerTool.Infrastructure.Common;
 
 namespace CigerTool.Infrastructure.Environment;
 
+[SupportedOSPlatform("windows")]
 public sealed class DesktopEnvironmentProfileService : IEnvironmentProfileService
 {
     public AppEnvironmentProfile GetCurrentProfile()

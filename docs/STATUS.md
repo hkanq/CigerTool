@@ -1,5 +1,15 @@
 # CigerTool Durum
 
+## Son Tur Özeti
+
+Bu turda şu başlıklar tamamlandı:
+
+- pencere kabuğu standart Windows başlık çubuğu davranışına geri alındı
+- `USB Ortamı Oluştur` akışı kaynak sorgulama, hedef denetimi, indirme, yazma, doğrulama ve iptal yönetimiyle sadeleştirildi
+- USB indirme ve yazma katmanına gerçek ilerleme bildirimi eklendi
+- test projelerindeki Windows platform uyarıları kapatıldı
+- çözüm `0 uyarı / 0 hata` ile derlendi, testlerden geçti ve iki yayın çıktısı yeniden üretildi
+
 ## Güncel Aşama
 
 Bu turda ürün yüzeyi ve temel kullanım güvenilirliği birlikte güçlendirildi:

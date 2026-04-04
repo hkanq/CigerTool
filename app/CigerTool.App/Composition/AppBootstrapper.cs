@@ -25,6 +25,7 @@ public static class AppBootstrapper
         ISettingsService settingsService = new JsonSettingsService(appPathService);
         IOperationLogService operationLogService = new FileOperationLogService(appPathService);
         IDiskInventoryService diskInventoryService = new RuntimeDiskInventoryService(operationLogService);
+        IDiskBenchmarkService diskBenchmarkService = new DiskBenchmarkService(operationLogService);
         IBackupWorkflowService backupWorkflowService = new BackupWorkflowService(
             diskInventoryService,
             environmentProfileService,
@@ -70,7 +71,7 @@ public static class AppBootstrapper
             () => new DashboardPageViewModel(dashboardService),
             () => new CloningPageViewModel(cloneWorkflowService, environmentProfileService, operationLogService),
             () => new BackupImagePageViewModel(backupWorkflowService, operationLogService),
-            () => new DisksPageViewModel(diskInventoryService),
+            () => new DisksPageViewModel(diskInventoryService, diskBenchmarkService),
             () => new UsbCreatorPageViewModel(usbCreationService),
             () => new LogsPageViewModel(operationLogService),
             () => new SettingsPageViewModel(settingsService));

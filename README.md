@@ -1,5 +1,14 @@
 # CigerTool
 
+## Son Güncelleme
+
+Bu turda ürünün son kullanıcı deneyimini doğrudan etkileyen iki kritik alan güncellendi:
+
+- pencere kabuğu yeniden standart Windows davranışına alındı; başlık, sürükleme ve pencere düğmeleri işletim sistemi tarafından kararlı şekilde yönetiliyor
+- `USB Ortamı Oluştur` ekranı sadeleştirildi; kaynak sorgulama açılışta otomatik çalışıyor, hedef USB uygunluğu otomatik denetleniyor ve tek akışta `otomatik indir ve yaz` işlemi açığa çıkarıldı
+- indirme, yazma ve son doğrulama sırasında canlı ilerleme bilgisi ile iptal akışı eklendi
+- üretim derlemesi `0 uyarı / 0 hata` durumuna getirildi
+
 CigerTool, Windows için geliştirilen yerel bir disk işlemleri ürün ailesidir.
 
 Ürün ailesi iki teslimattan oluşur:

@@ -1,10 +1,12 @@
 using System.Management;
+using System.Runtime.Versioning;
 using CigerTool.Application.Contracts;
 using CigerTool.Domain.Enums;
 using CigerTool.Usb.Models;
 
 namespace CigerTool.Usb.Services;
 
+[SupportedOSPlatform("windows")]
 internal sealed class UsbDeviceDiscoveryService(IOperationLogService operationLogService)
 {
     private const string StorageNamespace = @"ROOT\Microsoft\Windows\Storage";
@@ -288,9 +290,12 @@ internal sealed class UsbDeviceDiscoveryService(IOperationLogService operationLo
                legacyRecord?.IsUsbCandidate == true ||
                ContainsIgnoreCase(friendlyName, "usb") ||
                ContainsIgnoreCase(friendlyName, "removable") ||
+               ContainsIgnoreCase(friendlyName, "portable") ||
+               ContainsIgnoreCase(friendlyName, "external") ||
                ContainsIgnoreCase(friendlyName, "flash") ||
                ContainsIgnoreCase(friendlyName, "sd") ||
-               ContainsIgnoreCase(path, "usb");
+               ContainsIgnoreCase(path, "usb") ||
+               ContainsIgnoreCase(path, "removable");
     }
 
     private static bool IsLegacyUsbCandidate(
@@ -306,6 +311,8 @@ internal sealed class UsbDeviceDiscoveryService(IOperationLogService operationLo
                pnpDeviceId.Contains("USBSTOR", StringComparison.OrdinalIgnoreCase) ||
                ContainsIgnoreCase(model, "usb") ||
                ContainsIgnoreCase(model, "flash") ||
+               ContainsIgnoreCase(model, "portable") ||
+               ContainsIgnoreCase(model, "external") ||
                ContainsIgnoreCase(model, "removable") ||
                ContainsIgnoreCase(model, "card");
     }

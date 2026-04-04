@@ -1,4 +1,5 @@
 using System.Net.Http;
+using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using CigerTool.Application.Contracts;
 using CigerTool.Application.Models;
@@ -9,6 +10,7 @@ using CigerTool.Usb.Models;
 
 namespace CigerTool.Usb.Services;
 
+[SupportedOSPlatform("windows")]
 public sealed class UsbCreationService : IUsbCreationService
 {
     private static readonly HttpClient HttpClient = new()
@@ -152,6 +154,10 @@ public sealed class UsbCreationService : IUsbCreationService
 
             return new UsbCreatorOperationResult(true, OperationSeverity.Info, summary.Status);
         }
+        catch (OperationCanceledException)
+        {
+            return new UsbCreatorOperationResult(false, OperationSeverity.Warning, "USB yazma işlemi iptal edildi.");
+        }
         catch (Exception ex)
         {
             _operationLogService.Record(
@@ -270,7 +276,9 @@ public sealed class UsbCreationService : IUsbCreationService
         return new UsbCreatorOperationResult(true, OperationSeverity.Info, "Elle seçilen imaj temizlendi. Kaynağı yeniden yenileyin.");
     }
 
-    public async Task<UsbCreatorOperationResult> DownloadImageAsync(CancellationToken cancellationToken = default)
+    public async Task<UsbCreatorOperationResult> DownloadImageAsync(
+        IProgress<OperationProgressSnapshot>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         ReleaseManifestSummary releaseSummary;
         lock (_sync)
@@ -314,6 +322,9 @@ public sealed class UsbCreationService : IUsbCreationService
             await using var output = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, 1024 * 1024, useAsync: true);
             using var sha256 = SHA256.Create();
             var buffer = new byte[1024 * 1024];
+            var totalBytes = response.Content.Headers.ContentLength ?? releaseSummary.SizeBytes ?? 0L;
+            var processedBytes = 0L;
+            var startedAt = DateTimeOffset.UtcNow;
 
             while (true)
             {
@@ -325,6 +336,15 @@ public sealed class UsbCreationService : IUsbCreationService
 
                 await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
                 sha256.TransformBlock(buffer, 0, read, null, 0);
+                processedBytes += read;
+                ReportProgress(
+                    progress,
+                    "İmaj indiriliyor",
+                    $"{releaseSummary.ImageName} indiriliyor.",
+                    processedBytes,
+                    totalBytes,
+                    startedAt,
+                    totalBytes <= 0);
             }
 
             sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
@@ -390,6 +410,11 @@ public sealed class UsbCreationService : IUsbCreationService
 
             return new UsbCreatorOperationResult(true, OperationSeverity.Info, "İmaj indirildi ve hazırlandı.");
         }
+        catch (OperationCanceledException)
+        {
+            TryDeleteFile(tempPath);
+            return new UsbCreatorOperationResult(false, OperationSeverity.Warning, "İmaj indirme işlemi iptal edildi.");
+        }
         catch (Exception ex)
         {
             TryDeleteFile(tempPath);
@@ -409,7 +434,9 @@ public sealed class UsbCreationService : IUsbCreationService
         }
     }
 
-    public async Task<UsbCreatorOperationResult> VerifyPreparedImageAsync(CancellationToken cancellationToken = default)
+    public async Task<UsbCreatorOperationResult> VerifyPreparedImageAsync(
+        IProgress<OperationProgressSnapshot>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         var imagePath = GetPreparedImagePath();
         if (string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath))
@@ -419,7 +446,7 @@ public sealed class UsbCreationService : IUsbCreationService
 
         try
         {
-            var calculatedSha = await _rawDiskWriter.ComputeFileSha256Async(imagePath, cancellationToken);
+            var calculatedSha = await _rawDiskWriter.ComputeFileSha256Async(imagePath, progress, cancellationToken);
             var expectedSha = GetExpectedSha256() ?? TryReadSidecarSha256(imagePath);
 
             UsbCreatorOperationResult result;
@@ -485,7 +512,11 @@ public sealed class UsbCreationService : IUsbCreationService
         }
     }
 
-    public async Task<UsbCreatorOperationResult> WriteImageAsync(string? usbDeviceId, bool confirmedByUser, CancellationToken cancellationToken = default)
+    public async Task<UsbCreatorOperationResult> WriteImageAsync(
+        string? usbDeviceId,
+        bool confirmedByUser,
+        IProgress<OperationProgressSnapshot>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         if (!confirmedByUser)
         {
@@ -520,7 +551,7 @@ public sealed class UsbCreationService : IUsbCreationService
             return new UsbCreatorOperationResult(false, OperationSeverity.Error, "Seçilen USB aygıtı imaj boyutu için yeterli değil.");
         }
 
-        var verification = await VerifyPreparedImageAsync(cancellationToken);
+        var verification = await VerifyPreparedImageAsync(progress, cancellationToken);
         var checksumState = GetChecksumState();
         if (checksumState is ChecksumVerificationState.Mismatch or ChecksumVerificationState.Failed)
         {
@@ -541,19 +572,19 @@ public sealed class UsbCreationService : IUsbCreationService
                     ["verification"] = verification.Message
                 });
 
-            await _rawDiskWriter.WriteImageAsync(imagePath, device, cancellationToken);
+            await _rawDiskWriter.WriteImageAsync(imagePath, device, progress, cancellationToken);
 
             var calculatedSha = GetCalculatedSha256();
             if (string.IsNullOrWhiteSpace(calculatedSha))
             {
-                calculatedSha = await _rawDiskWriter.ComputeFileSha256Async(imagePath, cancellationToken);
+                calculatedSha = await _rawDiskWriter.ComputeFileSha256Async(imagePath, progress, cancellationToken);
                 lock (_sync)
                 {
                     _calculatedSha256 = calculatedSha;
                 }
             }
 
-            var deviceSha = await _rawDiskWriter.ComputeDeviceSha256Async(device.PhysicalPath, imageLength, cancellationToken);
+            var deviceSha = await _rawDiskWriter.ComputeDeviceSha256Async(device.PhysicalPath, imageLength, progress, cancellationToken);
             if (!string.Equals(deviceSha, calculatedSha, StringComparison.OrdinalIgnoreCase))
             {
                 _operationLogService.Record(
@@ -853,6 +884,58 @@ public sealed class UsbCreationService : IUsbCreationService
         ChecksumVerificationState.Failed => "Başarısız",
         _ => state.ToString()
     };
+
+    private static void ReportProgress(
+        IProgress<OperationProgressSnapshot>? progress,
+        string phaseLabel,
+        string summary,
+        long processedBytes,
+        long totalBytes,
+        DateTimeOffset startedAt,
+        bool isIndeterminate = false)
+    {
+        if (progress is null)
+        {
+            return;
+        }
+
+        var elapsed = DateTimeOffset.UtcNow - startedAt;
+        var percent = totalBytes <= 0 || isIndeterminate
+            ? 0
+            : Math.Clamp(processedBytes * 100d / totalBytes, 0d, 100d);
+        var bytesPerSecond = elapsed.TotalSeconds <= 0 ? 0d : processedBytes / elapsed.TotalSeconds;
+        var remaining = bytesPerSecond <= 0 || totalBytes <= 0 || processedBytes >= totalBytes
+            ? TimeSpan.Zero
+            : TimeSpan.FromSeconds((totalBytes - processedBytes) / bytesPerSecond);
+
+        progress.Report(new OperationProgressSnapshot(
+            phaseLabel,
+            summary,
+            percent,
+            isIndeterminate,
+            processedBytes,
+            totalBytes,
+            FormatBytes(processedBytes),
+            totalBytes <= 0 ? "Bilinmiyor" : FormatBytes(totalBytes),
+            bytesPerSecond <= 0 ? "Hazırlanıyor" : $"{bytesPerSecond / 1024d / 1024d:0.0} MB/sn",
+            totalBytes <= 0 ? "Hesaplanıyor" : FormatDuration(remaining),
+            null));
+    }
+
+    private static string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalHours >= 1)
+        {
+            return $"{(int)duration.TotalHours}s {duration.Minutes}dk";
+        }
+
+        if (duration.TotalMinutes >= 1)
+        {
+            return $"{(int)duration.TotalMinutes}dk {duration.Seconds}sn";
+        }
+
+        return $"{Math.Max(0, duration.Seconds)}sn";
+    }
 
     private IReadOnlyList<UsbPhysicalDeviceInfo> TryGetInitialDevices()
     {

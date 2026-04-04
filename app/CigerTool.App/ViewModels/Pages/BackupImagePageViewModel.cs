@@ -234,11 +234,15 @@ public sealed class BackupImagePageViewModel : ViewModelBase
 
     public IReadOnlyList<string> PlanWarnings => Plan?.Warnings ?? Array.Empty<string>();
 
+    public string PrimaryPlanWarning => PlanWarnings.FirstOrDefault() ?? "Belirgin bir engel bulunmuyor.";
+
     public IReadOnlyList<string> ExecutionWarnings => LastExecution?.Warnings ?? Array.Empty<string>();
 
     public IReadOnlyList<WorkflowStepItem> PlanSteps => Plan?.Steps ?? Array.Empty<WorkflowStepItem>();
 
     public bool CanSavePlan => Plan?.CanExportPlan == true;
+
+    public bool HasPlanBlockingWarning => Plan is not null && !Plan.CanStartNow && PlanWarnings.Count > 0;
 
     public bool CanStartOperation => !IsOperationRunning && Plan?.CanStartNow == true && (!IsDestructiveOperation || ConfirmDestructiveRestore);
 
@@ -624,8 +628,10 @@ public sealed class BackupImagePageViewModel : ViewModelBase
     private void RaiseDerivedStateChanged()
     {
         RaisePropertyChanged(nameof(PlanWarnings));
+        RaisePropertyChanged(nameof(PrimaryPlanWarning));
         RaisePropertyChanged(nameof(ExecutionWarnings));
         RaisePropertyChanged(nameof(CanSavePlan));
+        RaisePropertyChanged(nameof(HasPlanBlockingWarning));
         RaisePropertyChanged(nameof(CanStartOperation));
         RaisePropertyChanged(nameof(CanCancelOperation));
         RaisePropertyChanged(nameof(CanSaveExecutionReport));

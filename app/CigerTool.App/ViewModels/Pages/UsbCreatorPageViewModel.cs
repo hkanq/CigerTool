@@ -1,8 +1,10 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using Microsoft.Win32;
 using CigerTool.Application.Contracts;
 using CigerTool.Application.Models;
+using CigerTool.Domain.Enums;
 
 namespace CigerTool.App.ViewModels.Pages;
 
@@ -11,12 +13,15 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
     private readonly IUsbCreationService _usbCreationService;
     private readonly AsyncRelayCommand _refreshReleaseCommand;
     private readonly AsyncRelayCommand _refreshDevicesCommand;
-    private readonly AsyncRelayCommand _downloadImageCommand;
-    private readonly AsyncRelayCommand _verifyImageCommand;
-    private readonly AsyncRelayCommand _writeImageCommand;
+    private readonly AsyncRelayCommand _downloadOnlyCommand;
+    private readonly AsyncRelayCommand _downloadAndWriteCommand;
+    private readonly AsyncRelayCommand _writePreparedImageCommand;
+    private readonly RelayCommand _cancelCurrentOperationCommand;
     private UsbCreatorWorkspaceSnapshot _snapshot;
     private UsbDeviceEntry? _selectedDevice;
-    private bool _confirmDestructiveWrite;
+    private OperationProgressSnapshot? _currentOperationProgress;
+    private CancellationTokenSource? _operationCancellationTokenSource;
+    private bool _isOperationRunning;
     private string _statusMessage;
 
     public UsbCreatorPageViewModel(IUsbCreationService usbCreationService)
@@ -24,14 +29,18 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
         _usbCreationService = usbCreationService;
         _snapshot = usbCreationService.GetSnapshot();
         _selectedDevice = _snapshot.Devices.FirstOrDefault(device => device.CanWrite);
-        _statusMessage = _snapshot.ReleaseSourceStatus;
-        _refreshReleaseCommand = new AsyncRelayCommand(_ => ExecuteOperationAsync(() => _usbCreationService.RefreshReleaseInfoAsync(), "Kurulum kaynağı bilgisi yenilendi."));
-        _refreshDevicesCommand = new AsyncRelayCommand(_ => ExecuteOperationAsync(() => _usbCreationService.RefreshUsbDevicesAsync(), "USB aygıt listesi yenilendi."));
-        _downloadImageCommand = new AsyncRelayCommand(_ => ExecuteOperationAsync(() => _usbCreationService.DownloadImageAsync(), "İmaj indirme akışı tamamlandı."));
-        _verifyImageCommand = new AsyncRelayCommand(_ => ExecuteOperationAsync(() => _usbCreationService.VerifyPreparedImageAsync(), "Bütünlük doğrulaması tamamlandı."));
-        _writeImageCommand = new AsyncRelayCommand(_ => WriteImageAsync(), _ => CanWriteImage());
-        BrowseManualImageCommand = new AsyncRelayCommand(_ => BrowseManualImageAsync());
-        ClearManualImageCommand = new AsyncRelayCommand(_ => ClearManualImageAsync());
+        _statusMessage = "Ortam kaynağı ve USB aygıtları hazırlanıyor.";
+
+        _refreshReleaseCommand = new AsyncRelayCommand(_ => RefreshReleaseAsync(), _ => !IsOperationRunning);
+        _refreshDevicesCommand = new AsyncRelayCommand(_ => RefreshDevicesAsync(), _ => !IsOperationRunning);
+        _downloadOnlyCommand = new AsyncRelayCommand(_ => DownloadOnlyAsync(), _ => CanDownloadOnly);
+        _downloadAndWriteCommand = new AsyncRelayCommand(_ => DownloadAndWriteAsync(), _ => CanDownloadAndWrite);
+        _writePreparedImageCommand = new AsyncRelayCommand(_ => WritePreparedImageAsync(), _ => CanWritePreparedImage);
+        _cancelCurrentOperationCommand = new RelayCommand(_ => CancelCurrentOperation(), _ => CanCancelCurrentOperation);
+
+        BrowseManualImageCommand = new AsyncRelayCommand(_ => BrowseManualImageAsync(), _ => !IsOperationRunning);
+        ClearManualImageCommand = new AsyncRelayCommand(_ => ClearManualImageAsync(), _ => CanClearManualImage);
+
         _ = WarmUpAsync();
     }
 
@@ -47,17 +56,27 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
         set
         {
             SetProperty(ref _selectedDevice, value);
-            _writeImageCommand.RaiseCanExecuteChanged();
+            RaiseDerivedStateChanged();
         }
     }
 
-    public bool ConfirmDestructiveWrite
+    public OperationProgressSnapshot? CurrentOperationProgress
     {
-        get => _confirmDestructiveWrite;
-        set
+        get => _currentOperationProgress;
+        private set
         {
-            SetProperty(ref _confirmDestructiveWrite, value);
-            _writeImageCommand.RaiseCanExecuteChanged();
+            SetProperty(ref _currentOperationProgress, value);
+            RaiseDerivedStateChanged();
+        }
+    }
+
+    public bool IsOperationRunning
+    {
+        get => _isOperationRunning;
+        private set
+        {
+            SetProperty(ref _isOperationRunning, value);
+            RaiseDerivedStateChanged();
         }
     }
 
@@ -69,30 +88,160 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
 
     public bool HasUsbDevices => Snapshot.Devices.Count > 0;
 
-    public string UsbDiscoveryHint => HasUsbDevices
-        ? "Bağlı aygıtın modelini, kapasitesini ve güvenlik durumunu aşağıdan kontrol edin."
-        : "USB aygıtı görünmüyorsa bağlantıyı yenileyin, yönetici yetkisini doğrulayın ve Windows'un aygıtı algıladığından emin olun.";
+    public bool HasPreparedImage =>
+        !string.IsNullOrWhiteSpace(Snapshot.Release.PreparedImagePath) &&
+        File.Exists(Snapshot.Release.PreparedImagePath);
+
+    public bool HasRemoteImageSource => !string.IsNullOrWhiteSpace(Snapshot.Release.ImageUrl);
+
+    public bool CanClearManualImage =>
+        !IsOperationRunning &&
+        string.Equals(Snapshot.Release.ModeLabel, "Elle seçilen dosya", StringComparison.OrdinalIgnoreCase);
+
+    public bool CanDownloadOnly => !IsOperationRunning && HasRemoteImageSource;
+
+    public bool CanDownloadAndWrite =>
+        !IsOperationRunning &&
+        Snapshot.IsAdministrator &&
+        SelectedDevice?.CanWrite == true &&
+        (HasPreparedImage || HasRemoteImageSource);
+
+    public bool CanWritePreparedImage =>
+        !IsOperationRunning &&
+        Snapshot.IsAdministrator &&
+        SelectedDevice?.CanWrite == true &&
+        HasPreparedImage;
+
+    public bool CanCancelCurrentOperation => IsOperationRunning;
+
+    public string SourceStatusLabel =>
+        HasPreparedImage
+            ? "İmaj hazır"
+            : HasRemoteImageSource
+                ? "İndirilmeyi bekliyor"
+                : "Elle dosya seçin";
+
+    public string SourceStatusMessage
+    {
+        get
+        {
+            if (HasPreparedImage)
+            {
+                return $"Hazır dosya: {Snapshot.Release.PreparedImagePath}";
+            }
+
+            return Snapshot.Release.Status;
+        }
+    }
+
+    public string SelectedDeviceTitle =>
+        SelectedDevice?.DisplayName ?? "Henüz bir USB aygıtı seçilmedi.";
+
+    public string SelectedDeviceMessage
+    {
+        get
+        {
+            if (SelectedDevice is null)
+            {
+                return HasUsbDevices
+                    ? "Listeden hedef USB aygıtını seçin. Uygunluk otomatik olarak denetlenir."
+                    : "Takılı USB aygıtı bulunamadı. Aygıtı bağlayıp listeyi yenileyin.";
+            }
+
+            return SelectedDevice.CanWrite
+                ? "Seçilen aygıt yazmaya uygun görünüyor."
+                : SelectedDevice.SafetyStatus;
+        }
+    }
+
+    public string SelectedDeviceDetail
+    {
+        get
+        {
+            if (SelectedDevice is null)
+            {
+                return "Model, bağlı sürücü harfleri ve uygunluk durumu burada gösterilir.";
+            }
+
+            return $"{SelectedDevice.Model} · {SelectedDevice.SizeLabel} · {SelectedDevice.MountedVolumesLabel}";
+        }
+    }
+
+    public string UsbDiscoveryHint =>
+        HasUsbDevices
+            ? "Hedef aygıt seçildiğinde boyut ve güvenlik uygunluğu otomatik olarak denetlenir."
+            : "USB aygıtı görünmüyorsa bağlantıyı kontrol edin ve listeyi yenileyin.";
+
+    public double ProgressPercent => CurrentOperationProgress?.Percent ?? 0;
+
+    public bool IsProgressIndeterminate => CurrentOperationProgress?.IsIndeterminate ?? false;
+
+    public string ProgressSummary =>
+        CurrentOperationProgress?.Summary ?? "Henüz çalışan bir USB hazırlama işlemi yok.";
+
+    public string ProgressDetail
+    {
+        get
+        {
+            if (CurrentOperationProgress is null)
+            {
+                return "İndirme, yazma ve doğrulama durumları burada gösterilir.";
+            }
+
+            return $"{CurrentOperationProgress.ProcessedLabel} / {CurrentOperationProgress.TotalLabel} · {CurrentOperationProgress.SpeedLabel} · Kalan {CurrentOperationProgress.RemainingLabel}";
+        }
+    }
 
     public ICommand RefreshReleaseCommand => _refreshReleaseCommand;
 
     public ICommand RefreshDevicesCommand => _refreshDevicesCommand;
 
+    public ICommand DownloadOnlyCommand => _downloadOnlyCommand;
+
+    public ICommand DownloadAndWriteCommand => _downloadAndWriteCommand;
+
+    public ICommand WritePreparedImageCommand => _writePreparedImageCommand;
+
+    public ICommand CancelCurrentOperationCommand => _cancelCurrentOperationCommand;
+
     public ICommand BrowseManualImageCommand { get; }
 
     public ICommand ClearManualImageCommand { get; }
 
-    public ICommand DownloadImageCommand => _downloadImageCommand;
+    private async Task WarmUpAsync()
+    {
+        try
+        {
+            await RefreshReleaseAsync();
+            await RefreshDevicesAsync();
+            StatusMessage = "Ortam kaynağı ve USB aygıtları hazır.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Açılış denetimi tamamlanamadı: {ex.Message}";
+        }
+    }
 
-    public ICommand VerifyImageCommand => _verifyImageCommand;
+    private async Task RefreshReleaseAsync()
+    {
+        var result = await _usbCreationService.RefreshReleaseInfoAsync();
+        RefreshSnapshot();
+        StatusMessage = result.Message;
+    }
 
-    public ICommand WriteImageCommand => _writeImageCommand;
+    private async Task RefreshDevicesAsync()
+    {
+        var result = await _usbCreationService.RefreshUsbDevicesAsync();
+        RefreshSnapshot();
+        StatusMessage = result.Message;
+    }
 
     private async Task BrowseManualImageAsync()
     {
         var dialog = new OpenFileDialog
         {
-            Title = "CigerTool OS imajını seç",
-            Filter = "Disk İmajları|*.img;*.iso;*.bin;*.wim|Tüm Dosyalar|*.*",
+            Title = "CigerTool OS imajını seçin",
+            Filter = "Desteklenen imajlar|*.img;*.iso;*.bin;*.wim|Tüm dosyalar|*.*",
             CheckFileExists = true,
             Multiselect = false
         };
@@ -105,57 +254,198 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
 
         var setResult = _usbCreationService.SetManualImagePath(dialog.FileName);
         StatusMessage = setResult.Message;
-        await ExecuteOperationAsync(() => _usbCreationService.RefreshReleaseInfoAsync(), "Elle seçilen imaj bilgisi güncellendi.");
+        await RefreshReleaseAsync();
     }
 
     private async Task ClearManualImageAsync()
     {
         var clearResult = _usbCreationService.ClearManualImageSelection();
         StatusMessage = clearResult.Message;
-        await ExecuteOperationAsync(() => _usbCreationService.RefreshReleaseInfoAsync(), "Elle seçilen imaj temizlendi.");
+        await RefreshReleaseAsync();
     }
 
-    private async Task WriteImageAsync()
+    private async Task DownloadOnlyAsync()
     {
-        if (!CanWriteImage() || SelectedDevice is null)
+        if (!HasRemoteImageSource)
         {
-            StatusMessage = "Yazma işlemi için uygun aygıt seçin ve onay kutusunu işaretleyin.";
+            StatusMessage = "Bu kaynakta indirilecek bir imaj adresi bulunmuyor.";
             return;
         }
 
-        var confirmation = MessageBox.Show(
-            $"Seçilen USB aygıttaki tüm veriler silinecek.\n\nAygıt: {SelectedDevice.DisplayName}\nYol: {SelectedDevice.PhysicalPath}\n\nDevam etmek istiyor musunuz?",
-            "USB yazma onayı",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
+        await ExecuteOperationAsync(
+            "İmaj indiriliyor",
+            progress => _usbCreationService.DownloadImageAsync(progress, _operationCancellationTokenSource!.Token));
+    }
 
-        if (confirmation != MessageBoxResult.Yes)
+    private async Task WritePreparedImageAsync()
+    {
+        if (!EnsureWritableDeviceSelected())
+        {
+            return;
+        }
+
+        if (!HasPreparedImage)
+        {
+            StatusMessage = "Önce hazır bir imaj seçin veya indirin.";
+            return;
+        }
+
+        if (!ConfirmWrite())
         {
             StatusMessage = "USB yazma işlemi iptal edildi.";
             return;
         }
 
-        var result = await _usbCreationService.WriteImageAsync(SelectedDevice.Id, confirmedByUser: true);
-        RefreshSnapshot();
-        StatusMessage = result.Message;
-        _writeImageCommand.RaiseCanExecuteChanged();
+        await ExecuteOperationAsync(
+            "USB'ye yazılıyor",
+            async progress =>
+            {
+                SetManualProgress("Bütünlük doğrulanıyor", "Hazırlanan imaj dosyası kontrol ediliyor.", isIndeterminate: true);
+                var verify = await _usbCreationService.VerifyPreparedImageAsync(progress, _operationCancellationTokenSource!.Token);
+                RefreshSnapshot();
+                if (!verify.Succeeded)
+                {
+                    return verify;
+                }
+
+                return await _usbCreationService.WriteImageAsync(
+                    SelectedDevice!.Id,
+                    confirmedByUser: true,
+                    progress,
+                    _operationCancellationTokenSource!.Token);
+            });
     }
 
-    private bool CanWriteImage()
+    private async Task DownloadAndWriteAsync()
     {
-        return Snapshot.CanWriteFromCurrentState &&
-               SelectedDevice?.CanWrite == true &&
-               ConfirmDestructiveWrite;
+        if (!EnsureWritableDeviceSelected())
+        {
+            return;
+        }
+
+        if (!ConfirmWrite())
+        {
+            StatusMessage = "USB yazma işlemi iptal edildi.";
+            return;
+        }
+
+        await ExecuteOperationAsync(
+            "Ortam hazırlanıyor",
+            async progress =>
+            {
+                if (!HasPreparedImage)
+                {
+                    var refresh = await _usbCreationService.RefreshReleaseInfoAsync(_operationCancellationTokenSource!.Token);
+                    RefreshSnapshot();
+                    if (!refresh.Succeeded && !HasPreparedImage)
+                    {
+                        return refresh;
+                    }
+                }
+
+                if (!HasPreparedImage)
+                {
+                    var download = await _usbCreationService.DownloadImageAsync(progress, _operationCancellationTokenSource!.Token);
+                    RefreshSnapshot();
+                    if (!download.Succeeded)
+                    {
+                        return download;
+                    }
+                }
+
+                SetManualProgress("Bütünlük doğrulanıyor", "Hazırlanan imaj dosyası kontrol ediliyor.", isIndeterminate: true);
+                var verify = await _usbCreationService.VerifyPreparedImageAsync(progress, _operationCancellationTokenSource!.Token);
+                RefreshSnapshot();
+                if (!verify.Succeeded)
+                {
+                    return verify;
+                }
+
+                return await _usbCreationService.WriteImageAsync(
+                    SelectedDevice!.Id,
+                    confirmedByUser: true,
+                    progress,
+                    _operationCancellationTokenSource!.Token);
+            });
     }
 
-    private async Task ExecuteOperationAsync(Func<Task<UsbCreatorOperationResult>> operation, string fallbackSuccessMessage)
+    private async Task ExecuteOperationAsync(
+        string initialStatus,
+        Func<IProgress<OperationProgressSnapshot>, Task<UsbCreatorOperationResult>> operation)
     {
-        var result = await operation();
-        RefreshSnapshot();
-        StatusMessage = string.IsNullOrWhiteSpace(result.Message) && result.Succeeded
-            ? fallbackSuccessMessage
-            : result.Message;
-        _writeImageCommand.RaiseCanExecuteChanged();
+        IsOperationRunning = true;
+        CurrentOperationProgress = null;
+        StatusMessage = initialStatus;
+        _operationCancellationTokenSource = new CancellationTokenSource();
+        var progress = new Progress<OperationProgressSnapshot>(snapshot => CurrentOperationProgress = snapshot);
+
+        try
+        {
+            var result = await operation(progress);
+            RefreshSnapshot();
+            StatusMessage = result.Message;
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "İşlem iptal edildi.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"İşlem tamamlanamadı: {ex.Message}";
+        }
+        finally
+        {
+            IsOperationRunning = false;
+            _operationCancellationTokenSource?.Dispose();
+            _operationCancellationTokenSource = null;
+            RaiseDerivedStateChanged();
+        }
+    }
+
+    private void CancelCurrentOperation()
+    {
+        _operationCancellationTokenSource?.Cancel();
+        StatusMessage = "İptal isteği gönderildi.";
+    }
+
+    private bool EnsureWritableDeviceSelected()
+    {
+        if (SelectedDevice is null)
+        {
+            StatusMessage = "Önce hedef USB aygıtını seçin.";
+            return false;
+        }
+
+        if (!SelectedDevice.CanWrite)
+        {
+            StatusMessage = SelectedDevice.SafetyStatus;
+            return false;
+        }
+
+        if (!Snapshot.IsAdministrator)
+        {
+            StatusMessage = "USB yazmak için uygulama yönetici olarak çalışmalıdır.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool ConfirmWrite()
+    {
+        if (SelectedDevice is null)
+        {
+            return false;
+        }
+
+        var message =
+            $"Seçilen USB aygıtındaki tüm veriler silinecek.\n\nAygıt: {SelectedDevice.DisplayName}\nSürücü harfleri: {SelectedDevice.MountedVolumesLabel}\n\nDevam etmek istiyor musunuz?";
+
+        return MessageBox.Show(
+                   message,
+                   "USB yazma onayı",
+                   MessageBoxButton.YesNo,
+                   MessageBoxImage.Warning) == MessageBoxResult.Yes;
     }
 
     private void RefreshSnapshot()
@@ -163,23 +453,54 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
         var previousId = SelectedDevice?.Id;
         Snapshot = _usbCreationService.GetSnapshot();
         SelectedDevice = Snapshot.Devices.FirstOrDefault(device => device.Id == previousId)
-                         ?? Snapshot.Devices.FirstOrDefault(device => device.CanWrite);
+                         ?? Snapshot.Devices.FirstOrDefault(device => device.CanWrite)
+                         ?? Snapshot.Devices.FirstOrDefault();
         RaisePropertyChanged(nameof(HasUsbDevices));
-        RaisePropertyChanged(nameof(UsbDiscoveryHint));
+        RaisePropertyChanged(nameof(HasPreparedImage));
+        RaisePropertyChanged(nameof(HasRemoteImageSource));
+        RaiseDerivedStateChanged();
     }
 
-    private async Task WarmUpAsync()
+    private void SetManualProgress(string phaseLabel, string summary, bool isIndeterminate)
     {
-        try
-        {
-            var result = await _usbCreationService.RefreshUsbDevicesAsync();
-            RefreshSnapshot();
-            StatusMessage = result.Message;
-            _writeImageCommand.RaiseCanExecuteChanged();
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"USB aygıt listesi açılışta yenilenemedi: {ex.Message}";
-        }
+        CurrentOperationProgress = new OperationProgressSnapshot(
+            phaseLabel,
+            summary,
+            0,
+            isIndeterminate,
+            0,
+            0,
+            "0 B",
+            "Bilinmiyor",
+            "Hazırlanıyor",
+            "Hesaplanıyor",
+            null);
+    }
+
+    private void RaiseDerivedStateChanged()
+    {
+        RaisePropertyChanged(nameof(CanClearManualImage));
+        RaisePropertyChanged(nameof(CanDownloadOnly));
+        RaisePropertyChanged(nameof(CanDownloadAndWrite));
+        RaisePropertyChanged(nameof(CanWritePreparedImage));
+        RaisePropertyChanged(nameof(CanCancelCurrentOperation));
+        RaisePropertyChanged(nameof(SourceStatusLabel));
+        RaisePropertyChanged(nameof(SourceStatusMessage));
+        RaisePropertyChanged(nameof(SelectedDeviceTitle));
+        RaisePropertyChanged(nameof(SelectedDeviceMessage));
+        RaisePropertyChanged(nameof(SelectedDeviceDetail));
+        RaisePropertyChanged(nameof(UsbDiscoveryHint));
+        RaisePropertyChanged(nameof(ProgressPercent));
+        RaisePropertyChanged(nameof(IsProgressIndeterminate));
+        RaisePropertyChanged(nameof(ProgressSummary));
+        RaisePropertyChanged(nameof(ProgressDetail));
+        _refreshReleaseCommand.RaiseCanExecuteChanged();
+        _refreshDevicesCommand.RaiseCanExecuteChanged();
+        _downloadOnlyCommand.RaiseCanExecuteChanged();
+        _downloadAndWriteCommand.RaiseCanExecuteChanged();
+        _writePreparedImageCommand.RaiseCanExecuteChanged();
+        _cancelCurrentOperationCommand.RaiseCanExecuteChanged();
+        (BrowseManualImageCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+        (ClearManualImageCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
     }
 }

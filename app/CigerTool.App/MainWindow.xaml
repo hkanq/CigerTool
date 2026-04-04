@@ -5,18 +5,17 @@
         Icon="/Assets/CigerTool.ico"
         Width="1440"
         Height="900"
-        MinWidth="980"
-        MinHeight="680"
+        MinWidth="1040"
+        MinHeight="720"
         WindowStartupLocation="CenterScreen"
         WindowStyle="SingleBorderWindow"
         ResizeMode="CanResize"
-        AllowsTransparency="False"
-        Background="{StaticResource AppBackgroundBrush}"
+        Background="{StaticResource WindowSurfaceBrush}"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display"
         TextOptions.TextRenderingMode="ClearType">
-  <Grid Margin="18">
+  <Grid Margin="14">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="308" />
       <ColumnDefinition Width="*" />

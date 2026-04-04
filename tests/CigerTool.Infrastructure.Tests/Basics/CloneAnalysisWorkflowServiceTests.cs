@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using CigerTool.Application.Contracts;
 using CigerTool.Application.Models;
 using CigerTool.Domain.Enums;
@@ -7,6 +8,7 @@ using Xunit;
 
 namespace CigerTool.Infrastructure.Tests.Basics;
 
+[SupportedOSPlatform("windows")]
 public sealed class CloneAnalysisWorkflowServiceTests
 {
     [Fact]

@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Runtime.Versioning;
 using System.Text.Json;
 using CigerTool.Application.Models;
 using CigerTool.Domain.Enums;
@@ -7,6 +8,7 @@ using CigerTool.Infrastructure.Common;
 
 namespace CigerTool.Infrastructure.Backup;
 
+[SupportedOSPlatform("windows")]
 internal sealed class ImageContainerService
 {
     private readonly SmartCloneFileSystemExecutor _smartExecutor = new();

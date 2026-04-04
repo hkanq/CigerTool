@@ -14,9 +14,17 @@ public interface IUsbCreationService
 
     UsbCreatorOperationResult ClearManualImageSelection();
 
-    Task<UsbCreatorOperationResult> DownloadImageAsync(CancellationToken cancellationToken = default);
+    Task<UsbCreatorOperationResult> DownloadImageAsync(
+        IProgress<OperationProgressSnapshot>? progress = null,
+        CancellationToken cancellationToken = default);
 
-    Task<UsbCreatorOperationResult> VerifyPreparedImageAsync(CancellationToken cancellationToken = default);
+    Task<UsbCreatorOperationResult> VerifyPreparedImageAsync(
+        IProgress<OperationProgressSnapshot>? progress = null,
+        CancellationToken cancellationToken = default);
 
-    Task<UsbCreatorOperationResult> WriteImageAsync(string? usbDeviceId, bool confirmedByUser, CancellationToken cancellationToken = default);
+    Task<UsbCreatorOperationResult> WriteImageAsync(
+        string? usbDeviceId,
+        bool confirmedByUser,
+        IProgress<OperationProgressSnapshot>? progress = null,
+        CancellationToken cancellationToken = default);
 }

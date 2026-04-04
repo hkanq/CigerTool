@@ -3,9 +3,11 @@ using CigerTool.Application.Models;
 using CigerTool.Domain.Enums;
 using CigerTool.Domain.Models;
 using CigerTool.Infrastructure.Common;
+using System.Runtime.Versioning;
 
 namespace CigerTool.Infrastructure.Backup;
 
+[SupportedOSPlatform("windows")]
 public sealed class BackupWorkflowService(
     IDiskInventoryService diskInventoryService,
     IEnvironmentProfileService environmentProfileService,

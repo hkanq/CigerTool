@@ -1,10 +1,12 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Security.Principal;
 using Microsoft.Win32.SafeHandles;
 
 namespace CigerTool.Infrastructure.Common;
 
+[SupportedOSPlatform("windows")]
 internal sealed class RawVolumeAccessScope : IDisposable
 {
     private const uint GenericRead = 0x80000000;
