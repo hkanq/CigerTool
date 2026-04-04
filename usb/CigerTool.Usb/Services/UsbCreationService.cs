@@ -48,7 +48,7 @@ public sealed class UsbCreationService : IUsbCreationService
 
         var settings = settingsService.GetSettings();
         _releaseSummary = BuildInitialSummary(settings);
-        _devices = Array.Empty<UsbPhysicalDeviceInfo>();
+        _devices = TryGetInitialDevices();
         _checksumState = ChecksumVerificationState.NotStarted;
         _checksumStatus = "Bütünlük doğrulaması henüz yapılmadı.";
     }
@@ -190,7 +190,19 @@ public sealed class UsbCreationService : IUsbCreationService
                     ["count"] = devices.Count.ToString()
                 });
 
-            return Task.FromResult(new UsbCreatorOperationResult(true, OperationSeverity.Info, $"{devices.Count} USB aygıt tarandı."));
+            if (devices.Count == 0)
+            {
+                return Task.FromResult(new UsbCreatorOperationResult(
+                    true,
+                    OperationSeverity.Warning,
+                    "Bağlı USB aygıtı bulunamadı. Aygıtın takılı olduğundan, Windows tarafından görüldüğünden ve uygulamanın yönetici olarak çalıştığından emin olun."));
+            }
+
+            var writableCount = devices.Count(device => !device.IsSystemDisk);
+            return Task.FromResult(new UsbCreatorOperationResult(
+                true,
+                OperationSeverity.Info,
+                $"{devices.Count} USB aygıtı bulundu. {writableCount} aygıt yazma için değerlendirilebilir."));
         }
         catch (Exception ex)
         {
@@ -841,4 +853,16 @@ public sealed class UsbCreationService : IUsbCreationService
         ChecksumVerificationState.Failed => "Başarısız",
         _ => state.ToString()
     };
+
+    private IReadOnlyList<UsbPhysicalDeviceInfo> TryGetInitialDevices()
+    {
+        try
+        {
+            return _deviceDiscoveryService.GetUsbDevices();
+        }
+        catch
+        {
+            return Array.Empty<UsbPhysicalDeviceInfo>();
+        }
+    }
 }

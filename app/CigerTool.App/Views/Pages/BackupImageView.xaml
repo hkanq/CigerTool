@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Margin="18">
-      <Border Style="{StaticResource CardBorderStyle}" Background="#F4FBF8">
+      <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource AccentPanelBrush}">
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
@@ -78,7 +78,7 @@
               <ComboBox Margin="0,8,0,0"
                         ItemsSource="{Binding Snapshot.Operations}"
                         SelectedItem="{Binding SelectedOperation}"
-                        DisplayMemberPath="Title" />
+                        ItemTemplate="{StaticResource TitleDescriptionComboItemTemplate}" />
               <TextBlock Margin="0,8,0,0"
                          TextWrapping="Wrap"
                          Foreground="{StaticResource ContentMutedTextBrush}"
@@ -92,7 +92,7 @@
               <ComboBox Margin="0,8,0,0"
                         ItemsSource="{Binding Formats}"
                         SelectedItem="{Binding SelectedFormat}"
-                        DisplayMemberPath="Title" />
+                        ItemTemplate="{StaticResource TitleDescriptionComboItemTemplate}" />
               <TextBlock Margin="0,8,0,0"
                          TextWrapping="Wrap"
                          Foreground="{StaticResource ContentMutedTextBrush}"
@@ -106,7 +106,7 @@
             <ComboBox Margin="0,8,0,0"
                       ItemsSource="{Binding CaptureModes}"
                       SelectedItem="{Binding SelectedCaptureMode}"
-                      DisplayMemberPath="Title" />
+                      ItemTemplate="{StaticResource TitleDescriptionComboItemTemplate}" />
             <TextBlock Margin="0,8,0,0"
                        TextWrapping="Wrap"
                        Foreground="{StaticResource ContentMutedTextBrush}"
@@ -114,7 +114,7 @@
             <Border Margin="0,10,0,0"
                     Padding="12"
                     CornerRadius="14"
-                    Background="#F8F5EA">
+                    Background="{StaticResource AccentSoftBrush}">
               <TextBlock TextWrapping="Wrap"
                          Foreground="{StaticResource ContentTextBrush}"
                          Text="Akıllı imaj alma şu anda sistem dışı sürücüler için açıktır ve yalnızca kullanılan dosyaları kaydeder." />
@@ -124,10 +124,10 @@
           <StackPanel Margin="0,16,0,0"
                       Visibility="{Binding ShowSourceDiskSelector, Converter={StaticResource BooleanToVisibilityConverter}}">
             <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Kaynak sürücü" />
-            <ComboBox Margin="0,8,0,0"
-                      ItemsSource="{Binding Snapshot.CandidateDisks}"
-                      SelectedItem="{Binding SelectedSource}"
-                      DisplayMemberPath="Name" />
+              <ComboBox Margin="0,8,0,0"
+                        ItemsSource="{Binding Snapshot.CandidateDisks}"
+                        SelectedItem="{Binding SelectedSource}"
+                        ItemTemplate="{StaticResource DiskComboItemTemplate}" />
             <TextBlock Margin="0,8,0,0"
                        TextWrapping="Wrap"
                        Foreground="{StaticResource ContentMutedTextBrush}"
@@ -137,10 +137,10 @@
           <StackPanel Margin="0,16,0,0"
                       Visibility="{Binding ShowTargetDiskSelector, Converter={StaticResource BooleanToVisibilityConverter}}">
             <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Hedef sürücü" />
-            <ComboBox Margin="0,8,0,0"
-                      ItemsSource="{Binding Snapshot.CandidateDisks}"
-                      SelectedItem="{Binding SelectedTarget}"
-                      DisplayMemberPath="Name" />
+              <ComboBox Margin="0,8,0,0"
+                        ItemsSource="{Binding Snapshot.CandidateDisks}"
+                        SelectedItem="{Binding SelectedTarget}"
+                        ItemTemplate="{StaticResource DiskComboItemTemplate}" />
             <TextBlock Margin="0,8,0,0"
                        TextWrapping="Wrap"
                        Foreground="{StaticResource ContentMutedTextBrush}"
@@ -224,7 +224,7 @@
         </StackPanel>
       </Border>
 
-      <Border Style="{StaticResource CardBorderStyle}" Background="#F7FAFB">
+      <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource RaisedSurfaceBrush}">
         <StackPanel>
           <TextBlock FontSize="18"
                      FontWeight="SemiBold"
@@ -257,6 +257,22 @@
                      TextWrapping="Wrap"
                      Foreground="{StaticResource ContentMutedTextBrush}"
                      Text="{Binding Plan.ScopeNote, TargetNullValue='Bu bölüm desteklenen gerçek kapsamı açıkça gösterir.'}" />
+
+          <TextBlock Margin="0,12,0,0"
+                     FontWeight="SemiBold"
+                     Foreground="{StaticResource ContentHeadingBrush}"
+                     Text="Görülen nedenler" />
+          <ItemsControl Margin="0,8,0,0"
+                        ItemsSource="{Binding PlanWarnings}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Margin="0,0,0,8"
+                           TextWrapping="Wrap"
+                           Foreground="{StaticResource ContentTextBrush}"
+                           Text="{Binding}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
         </StackPanel>
       </Border>
 
@@ -297,7 +313,7 @@
                 <Border Margin="0,0,0,10"
                         Padding="14"
                         CornerRadius="16"
-                        Background="#F7FAFB"
+                        Background="{StaticResource SubtlePanelBrush}"
                         BorderBrush="{StaticResource CardBorderBrush}"
                         BorderThickness="1">
                   <StackPanel>
@@ -335,7 +351,7 @@
         </StackPanel>
       </Border>
 
-      <Border Style="{StaticResource CardBorderStyle}" Background="#F7FAFB">
+      <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource RaisedSurfaceBrush}">
         <StackPanel>
           <TextBlock FontSize="18"
                      FontWeight="SemiBold"

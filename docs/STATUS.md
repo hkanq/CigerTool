@@ -2,21 +2,27 @@
 
 ## Güncel Aşama
 
-Bu turda iki ana konu düzeltildi:
+Bu turda ürün yüzeyi ve temel kullanım güvenilirliği birlikte güçlendirildi:
 
-- uygulama yerel Windows pencere davranışına geri döndürüldü
-- yedekleme ve imaj modülünde gerçek akıllı imaj alma akışı açıldı
+- tüm uygulama koyu temaya taşındı
+- seçim kutuları ve kaydırma çubukları daha modern hale getirildi
+- uygulama her zaman yönetici yetkisi isteyecek şekilde sabitlendi
+- USB aygıt algılama tarafı daha toleranslı hale getirildi
+- yedekleme denetiminde başarısızlık nedenleri kullanıcıya daha açık gösterilmeye başlandı
 
 ## Bu Turda Yapılanlar
 
-- özel başlık çubuğu yaklaşımı bırakıldı
-- standart Windows küçültme, büyütme, kapatma ve sürükleme davranışı geri getirildi
-- pencere kenarındaki siyah çerçeve ve uyumsuz kabuk davranışına yol açan yaklaşım kaldırıldı
-- yedekleme ekranı son kullanıcı diliyle yeniden düzenlendi
-- bozuk dosya filtresi nedeniyle oluşan ham yedekleme hatası kapatıldı
-- sistem dışı sürücüler için akıllı `.ctimg` imaj alma açıldı
-- akıllı imaj geri yükleme akışı sistem dışı hedeflerde korunarak sürdürüldü
-- doğrulama, yürütme, ilerleme, iptal ve rapor kaydetme akışı korundu
+- sol menü ve genel yüzey için koyu tema fırçaları tamamlandı
+- kaba görünen kalın kaydırma çubukları inceltildi ve yuvarlatıldı
+- seçim kutuları daha modern, koyu ve açıklamalı hale getirildi
+- sürücü seçim kutularında model, kapasite ve sağlık özeti görünümü korundu
+- USB aygıtı seçimi açılır kutusu daha zengin özet göstermeye başladı
+- uygulama manifesti `requireAdministrator` düzeyine çekildi
+- USB ekranı açılır açılmaz aygıt taraması başlatılmaya başladı
+- USB aygıt algılama servisi modern depolama sorgusu ile eski WMI bilgisini birleştiren daha güçlü bir taramaya geçirildi
+- varsayılan yayın manifest adresi GitHub `raw` yolu üzerinden sabitlendi
+- GitHub `blob` adresi verilirse onu `raw` adresine dönüştüren davranış korundu
+- yedekleme denetimi başarısızsa ilk kritik neden özet metnine de taşındı
 
 ## Yayın Çıktıları
 
@@ -26,37 +32,51 @@ Bu turda iki ana konu düzeltildi:
 ## Davranış Notları
 
 - her iki yayın çıktısı da açılış için zorunlu yan dosya gerektirmez
+- her iki yayın da yönetici yetkisi ister
 - masaüstü yapısı yazılabilir verileri `%LocalAppData%\CigerTool` altında tutar
 - WinPE odaklı yapı yazılabilir verileri `%TEMP%\CigerTool` altında tutar
 - uygulama klasörü içine günlük veya veri klasörü açma önceliği yoktur
 
+## Ürün Yönü Notu
+
+Kullanıcı talebine göre ürün hedefi genişletildi:
+
+- tam disk akıllı imaj
+- ISO yazma
+- Rufus benzeri USB hazırlama kapsamı
+- USB üzerinden çalışan servis sistemi akışları
+- daha zengin disk sağlık ve performans araçları
+
+Bu noktada önemli ayrım şudur:
+
+- tam disk akıllı imaj, disk imajı alanıdır ve yerel imaj biçimiyle ele alınacaktır
+- ISO yazma, önyüklenebilir medya hazırlama alanıdır
+
+Bu nedenle `akıllı disk yedeği` ile `ISO yazma` aynı başlık altında karıştırılmayacaktır.
+
 ## Doğrulama
 
-Başarıyla çalıştırılan komutlar:
+Bu tur sonunda yeniden çalıştırılması gereken doğrulamalar:
 
 - `dotnet build CigerTool.sln -c Release`
 - `dotnet test CigerTool.sln -c Release --no-build`
 - `powershell -ExecutionPolicy Bypass -File build/scripts/Publish-CigerTool.ps1`
 
-Kısa açılış denemesi:
-
-- standart yapı açıldı ve ilk birkaç saniyede çökmedi
-- WinPE yapısı açıldı ve ilk birkaç saniyede çökmedi
-
 ## Bilinen Kalan Riskler
 
-- ham klon ve ham imaj iş akışları sürücü düzeyinde çalışır; tam disk bölüm tablosu yeniden kurmaz
-- akıllı kopya ve akıllı imaj NTFS odaklı, dosya temelli yaklaşımdır
-- masaüstünde çalışan sistem sürücüsüne ham yazma bilerek engellenir
-- gelişmiş SMART ve üretici telemetrisi hâlâ sınırlıdır
+- USB köprü denetleyicileri ve farklı harici disk kutuları üzerinde daha geniş fiziksel test gerekir
+- tam kapsamlı ISO yazma ve gelişmiş önyükleme profilleri henüz açılmadı
+- tam disk akıllı imaj kapsamı henüz tüm bölüm düzeni senaryolarını taşımıyor
+- gelişmiş SMART telemetrisi ve yerel benchmark katmanı henüz temel seviyenin üzerinde değil
 
 ## Bilinçli Ürün Sınırı
 
 Bu depo:
 
 - WinPE üretmez
-- ADK kurmaz
-- işletim sistemi imajı oluşturmaz
+- Windows ADK kurmaz
+- `boot.wim` oluşturmaz
+- işletim sistemi imajı üretmez
 
 Bu depo yalnızca:
 

@@ -622,7 +622,17 @@ public sealed class BackupWorkflowService(
         IReadOnlyList<string> warnings,
         IReadOnlyList<WorkflowStepItem> steps)
     {
-        return new BackupPlanResult(operation, statusLabel, summary, nextAction, scopeNote, canStartNow, canExportPlan, warnings, steps);
+        var effectiveSummary = summary;
+        var effectiveNextAction = nextAction;
+
+        if (!canStartNow && warnings.Count > 0)
+        {
+            var primaryWarning = warnings[0];
+            effectiveSummary = $"{summary} Neden: {primaryWarning}";
+            effectiveNextAction = $"{nextAction} Önce şu noktayı çözün: {primaryWarning}";
+        }
+
+        return new BackupPlanResult(operation, statusLabel, effectiveSummary, effectiveNextAction, scopeNote, canStartNow, canExportPlan, warnings, steps);
     }
 
     private static IReadOnlyList<WorkflowStepItem> BuildExecutionSteps(int activeIndex, bool endsWithExecution)

@@ -1,31 +1,51 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <SolidColorBrush x:Key="AppBackgroundBrush" Color="#E7EDF5" />
-  <SolidColorBrush x:Key="WindowSurfaceBrush" Color="#F8FAFD" />
-  <SolidColorBrush x:Key="WindowBorderBrush" Color="#CBD5E1" />
-  <SolidColorBrush x:Key="TitleBarSurfaceBrush" Color="#FDFEFF" />
-  <SolidColorBrush x:Key="TitleBarTextBrush" Color="#0F172A" />
-  <SolidColorBrush x:Key="TitleBarMutedTextBrush" Color="#64748B" />
+  <SolidColorBrush x:Key="AppBackgroundBrush" Color="#060A12" />
+  <SolidColorBrush x:Key="WindowSurfaceBrush" Color="#0B1220" />
+  <SolidColorBrush x:Key="WindowBorderBrush" Color="#182132" />
+  <SolidColorBrush x:Key="TitleBarSurfaceBrush" Color="#0F1728" />
+  <SolidColorBrush x:Key="TitleBarTextBrush" Color="#F8FAFC" />
+  <SolidColorBrush x:Key="TitleBarMutedTextBrush" Color="#8CA0B9" />
 
-  <SolidColorBrush x:Key="SidebarBrush" Color="#0F172A" />
-  <SolidColorBrush x:Key="SidebarPanelBrush" Color="#18243B" />
-  <SolidColorBrush x:Key="SidebarPanelHoverBrush" Color="#223252" />
-  <SolidColorBrush x:Key="SidebarPanelSelectedBrush" Color="#2A3E64" />
+  <SolidColorBrush x:Key="SidebarBrush" Color="#0B1220" />
+  <SolidColorBrush x:Key="SidebarPanelBrush" Color="#121C2F" />
+  <SolidColorBrush x:Key="SidebarPanelHoverBrush" Color="#172641" />
+  <SolidColorBrush x:Key="SidebarPanelSelectedBrush" Color="#1E3459" />
   <SolidColorBrush x:Key="SidebarTextBrush" Color="#F8FAFC" />
-  <SolidColorBrush x:Key="SidebarMutedTextBrush" Color="#A5B4C8" />
+  <SolidColorBrush x:Key="SidebarMutedTextBrush" Color="#9FB1C8" />
 
-  <SolidColorBrush x:Key="ContentSurfaceBrush" Color="#FCFDFE" />
-  <SolidColorBrush x:Key="ContentHeadingBrush" Color="#0F172A" />
-  <SolidColorBrush x:Key="ContentTextBrush" Color="#334155" />
-  <SolidColorBrush x:Key="ContentMutedTextBrush" Color="#64748B" />
+  <SolidColorBrush x:Key="ContentSurfaceBrush" Color="#0F1728" />
+  <SolidColorBrush x:Key="ContentHeadingBrush" Color="#F8FAFC" />
+  <SolidColorBrush x:Key="ContentTextBrush" Color="#D2DCE8" />
+  <SolidColorBrush x:Key="ContentMutedTextBrush" Color="#8CA0B9" />
 
-  <SolidColorBrush x:Key="AccentBrush" Color="#B7791F" />
-  <SolidColorBrush x:Key="AccentDarkBrush" Color="#8A5B16" />
-  <SolidColorBrush x:Key="AccentSoftBrush" Color="#F6E7C7" />
+  <SolidColorBrush x:Key="AccentBrush" Color="#D4A44B" />
+  <SolidColorBrush x:Key="AccentDarkBrush" Color="#B88429" />
+  <SolidColorBrush x:Key="AccentSoftBrush" Color="#2F2412" />
 
-  <SolidColorBrush x:Key="CardBorderBrush" Color="#E2E8F0" />
-  <SolidColorBrush x:Key="CardSurfaceBrush" Color="#F7F9FC" />
-  <SolidColorBrush x:Key="WindowButtonHoverBrush" Color="#E9EEF5" />
-  <SolidColorBrush x:Key="WindowButtonPressedBrush" Color="#D8E0EB" />
+  <SolidColorBrush x:Key="CardBorderBrush" Color="#1C2A41" />
+  <SolidColorBrush x:Key="CardSurfaceBrush" Color="#121C2D" />
+  <SolidColorBrush x:Key="RaisedSurfaceBrush" Color="#162235" />
+  <SolidColorBrush x:Key="SubtlePanelBrush" Color="#141F31" />
+  <SolidColorBrush x:Key="AccentPanelBrush" Color="#2A2113" />
+  <SolidColorBrush x:Key="InputSurfaceBrush" Color="#111B2A" />
+  <SolidColorBrush x:Key="InputBorderBrush" Color="#22314A" />
+  <SolidColorBrush x:Key="InputBorderHoverBrush" Color="#31507B" />
+  <SolidColorBrush x:Key="PopupSurfaceBrush" Color="#162234" />
+  <SolidColorBrush x:Key="PopupShadowBrush" Color="#66000000" />
+  <SolidColorBrush x:Key="SelectionHoverBrush" Color="#1A2740" />
+  <SolidColorBrush x:Key="SelectionCurrentBrush" Color="#243B61" />
+  <SolidColorBrush x:Key="TagSurfaceBrush" Color="#1A2435" />
+  <SolidColorBrush x:Key="TagTextBrush" Color="#F0D6A0" />
+
+  <SolidColorBrush x:Key="ScrollTrackBrush" Color="#111928" />
+  <SolidColorBrush x:Key="ScrollThumbBrush" Color="#75603A" />
+  <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#D4A44B" />
+
+  <SolidColorBrush x:Key="ProgressTrackBrush" Color="#121A28" />
+  <SolidColorBrush x:Key="ProgressFillBrush" Color="#D4A44B" />
+
+  <SolidColorBrush x:Key="WindowButtonHoverBrush" Color="#182539" />
+  <SolidColorBrush x:Key="WindowButtonPressedBrush" Color="#21324C" />
   <SolidColorBrush x:Key="CloseWindowHoverBrush" Color="#C24141" />
 </ResourceDictionary>

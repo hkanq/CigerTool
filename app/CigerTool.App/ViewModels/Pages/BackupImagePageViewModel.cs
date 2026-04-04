@@ -288,7 +288,9 @@ public sealed class BackupImagePageViewModel : ViewModelBase
         try
         {
             Plan = _backupWorkflowService.Analyze(BuildRequest());
-            StatusMessage = Plan.Summary;
+            StatusMessage = !Plan.CanStartNow && PlanWarnings.Count > 0
+                ? $"{Plan.Summary} İlk neden: {PlanWarnings[0]}"
+                : Plan.Summary;
         }
         catch (Exception ex)
         {

@@ -194,6 +194,8 @@ public sealed class ReleaseSourceResolver(
         string modeLabel,
         CancellationToken cancellationToken)
     {
+        manifestUrl = NormalizeManifestUrl(manifestUrl);
+
         if (!Uri.TryCreate(manifestUrl, UriKind.Absolute, out var manifestUri))
         {
             throw new InvalidOperationException("Manifest adresi geçerli, tam bir URL değil.");
@@ -472,6 +474,40 @@ public sealed class ReleaseSourceResolver(
             return null;
         }
 
-        return sha256.Trim().ToLowerInvariant();
+        var normalized = sha256.Trim().ToLowerInvariant();
+        if (normalized.Contains("put_real", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("placeholder", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return normalized.Length == 64 && normalized.All(Uri.IsHexDigit)
+            ? normalized
+            : null;
+    }
+
+    private static string NormalizeManifestUrl(string manifestUrl)
+    {
+        if (!Uri.TryCreate(manifestUrl, UriKind.Absolute, out var uri))
+        {
+            return manifestUrl;
+        }
+
+        if (!string.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase))
+        {
+            return manifestUrl;
+        }
+
+        var segments = uri.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length >= 4 && string.Equals(segments[2], "blob", StringComparison.OrdinalIgnoreCase))
+        {
+            var owner = segments[0];
+            var repo = segments[1];
+            var branch = segments[3];
+            var relativePath = string.Join('/', segments.Skip(4));
+            return $"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{relativePath}";
+        }
+
+        return manifestUrl;
     }
 }

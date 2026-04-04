@@ -135,7 +135,7 @@ public sealed class JsonSettingsService(IAppPathService appPathService) : ISetti
     {
         public string DefaultChannel { get; init; } = "stable";
 
-        public string? DefaultManifestUrl { get; init; }
+        public string? DefaultManifestUrl { get; init; } = "https://raw.githubusercontent.com/hkanq/CigerTool_Disk_Klonlama_hkannq/main/release.json";
 
         public ReleaseSourceSection Merge(OverrideReleaseSourceSection? overrideSection)
         {

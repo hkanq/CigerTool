@@ -44,6 +44,24 @@ Bu depo şunlardan sorumludur:
 - `.img` ile ham `.ctimg` arasında dönüştürme
 - USB için imaj indirme, doğrulama ve yazma
 
+## Ürün Hedefi
+
+CigerTool yalnızca klonlama aracı olarak kalmayacaktır. Hedef ürün yönü şunları içerir:
+
+- tüm diskin akıllı imajını yerel CigerTool biçiminde alabilmek
+- ISO yazma ve daha geniş USB hazırlama akışları
+- Rufus benzeri daha kapsamlı önyüklenebilir ortam hazırlama desteği
+- doğrudan USB üzerinden çalışan servis işletim sistemi akışları
+- daha zengin disk sağlık telemetrisi
+- yerel disk performans ölçümü ve kıyaslama araçları
+
+Önemli ayrım:
+
+- tam disk akıllı imaj alma, disk yedeği özelliğidir ve yerel disk imajı biçimiyle ele alınır
+- ISO yazma ise kurulum veya önyükleme medyası hazırlama özelliğidir
+
+Bu iki alan ürün içinde birlikte bulunacaktır, ancak aynı şey değildir.
+
 ## Bilinçli Kapsam Sınırı
 
 Bu sürümde henüz tam kapsamlı olmayan alanlar:
@@ -52,7 +70,9 @@ Bu sürümde henüz tam kapsamlı olmayan alanlar:
 - önyükleme onarımı
 - BitLocker iş akışları
 - gelişmiş SMART ve üretici telemetrisi
-- `Taşıma ve geçiş` bölümünde bağımsız yürütme motoru
+- bağımsız `Taşıma ve geçiş` yürütme motoru
+- tam kapsamlı ISO yazma ve gelişmiş önyüklenebilir USB profilleri
+- CrystalDiskInfo ve CrystalDiskMark düzeyinde tam yerel eşdeğer kapsam
 
 ## Yayın Çıktıları
 
@@ -60,6 +80,8 @@ Bu sürümde henüz tam kapsamlı olmayan alanlar:
 - WinPE odaklı yapı: [CigerTool.WinPE.exe](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/artifacts/winpe/CigerTool.WinPE.exe)
 
 Her iki çıktı da açılış için zorunlu yan dosya gerektirmez. Varsayılan ayarlar uygulamanın içinde taşınır.
+
+Her iki yayın da yönetici yetkisi ister.
 
 Yazılabilir uygulama verileri işletim sistemi konumlarına gider:
 

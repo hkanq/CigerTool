@@ -17,7 +17,7 @@
 
 - sürücüden ham `.img` alma
 - sürücüden ham `.ctimg` alma
-- sistem dışı sürücüden akıllı `.ctimg` alma
+- sistem dışı sürücülerden akıllı `.ctimg` alma
 - `.img` dosyasını sürücüye geri yükleme
 - ham `.ctimg` dosyasını sürücüye geri yükleme
 - akıllı `.ctimg` dosyasını sistem dışı sürücüye geri yükleme
@@ -58,6 +58,22 @@
 - akıllı imaj:
   şu an sistem dışı sürücülerle ve `.ctimg` biçimiyle sınırlıdır
 
+## Planlanan Ürün Hedefleri
+
+- tüm diskin akıllı imajını daha zengin yerel CigerTool biçimiyle alabilmek
+- ISO yazma
+- Rufus benzeri daha geniş USB hazırlama akışları
+- USB üzerinden doğrudan çalışan servis sistemi profilleri
+- daha güçlü disk sağlık telemetrisi
+- yerel performans ölçümü ve kıyaslama özellikleri
+
+Not:
+
+- tam disk akıllı imaj alma, disk yedekleme alanıdır
+- ISO yazma ise önyüklenebilir medya hazırlama alanıdır
+
+Bu ikisi aynı özellik değildir ve ayrı yürütme katmanlarıyla ele alınacaktır.
+
 ## Henüz Açılmayanlar
 
 - tam fiziksel disk bölüm tablosu yeniden kurma
@@ -65,6 +81,9 @@
 - BitLocker iş akışları
 - gelişmiş SMART ve üretici telemetrisi
 - bağımsız `Taşıma ve geçiş` yürütme motoru
+- tam kapsamlı ISO yazma
+- canlı işletim sistemi USB profillerinin tamamı
+- CrystalDiskInfo ve CrystalDiskMark düzeyinde tam yerel kapsama ulaşan sağlık/benchmark katmanı
 
 ## Dürüstlük Kuralı
 

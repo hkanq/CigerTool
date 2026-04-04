@@ -80,7 +80,7 @@
               <ComboBox Margin="0,8,0,0"
                         ItemsSource="{Binding Modes}"
                         SelectedItem="{Binding SelectedMode}"
-                        DisplayMemberPath="Title" />
+                        ItemTemplate="{StaticResource TitleDescriptionComboItemTemplate}" />
               <TextBlock Margin="0,8,0,0"
                          TextWrapping="Wrap"
                          Foreground="{StaticResource ContentMutedTextBrush}"
@@ -92,7 +92,7 @@
               <ComboBox Margin="0,8,0,0"
                         ItemsSource="{Binding Snapshot.Candidates}"
                         SelectedItem="{Binding SelectedSource}"
-                        DisplayMemberPath="Name" />
+                        ItemTemplate="{StaticResource DiskComboItemTemplate}" />
               <TextBlock Margin="0,8,0,0"
                          TextWrapping="Wrap"
                          Foreground="{StaticResource ContentMutedTextBrush}"
@@ -104,7 +104,7 @@
               <ComboBox Margin="0,8,0,0"
                         ItemsSource="{Binding Snapshot.Candidates}"
                         SelectedItem="{Binding SelectedTarget}"
-                        DisplayMemberPath="Name" />
+                        ItemTemplate="{StaticResource DiskComboItemTemplate}" />
               <TextBlock Margin="0,8,0,0"
                          TextWrapping="Wrap"
                          Foreground="{StaticResource ContentMutedTextBrush}"
@@ -139,7 +139,7 @@
         </StackPanel>
       </Border>
 
-      <Border Style="{StaticResource CardBorderStyle}" Background="#F7FAFB">
+      <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource RaisedSurfaceBrush}">
         <StackPanel>
           <TextBlock FontSize="18"
                      FontWeight="SemiBold"
@@ -204,7 +204,7 @@
                 <Border Margin="0,0,0,10"
                         Padding="14"
                         CornerRadius="16"
-                        Background="#F7FAFB"
+                        Background="{StaticResource SubtlePanelBrush}"
                         BorderBrush="{StaticResource CardBorderBrush}"
                         BorderThickness="1">
                   <StackPanel>
@@ -237,7 +237,7 @@
                 <Border Margin="0,0,0,10"
                         Padding="12"
                         CornerRadius="14"
-                        Background="#F7FAFB"
+                        Background="{StaticResource SubtlePanelBrush}"
                         BorderBrush="{StaticResource CardBorderBrush}"
                         BorderThickness="1">
                   <StackPanel>
@@ -259,7 +259,7 @@
         </StackPanel>
       </Border>
 
-      <Border Style="{StaticResource CardBorderStyle}" Background="#F7FAFB">
+      <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource RaisedSurfaceBrush}">
         <StackPanel>
           <TextBlock FontSize="18"
                      FontWeight="SemiBold"

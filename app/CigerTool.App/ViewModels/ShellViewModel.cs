@@ -32,15 +32,15 @@ public sealed class ShellViewModel : ViewModelBase
         ProductName = productName;
         ReadinessLabel = diagnostics.Severity switch
         {
-            OperationSeverity.Error => "Müdahale gerekiyor",
-            OperationSeverity.Warning => "Gözden geçirin",
-            _ => "Hazır"
+            OperationSeverity.Error => "Dikkat gerekiyor",
+            OperationSeverity.Warning => "Gözden geçirilecek noktalar var",
+            _ => "Kullanıma hazır"
         };
-        EditionLabel = environmentProfile.IsWinPe ? "Servis ortamı" : "Masaüstü";
-        ProductTagline = "Disk işlemlerini güvenle yönetin";
+        EditionLabel = environmentProfile.IsWinPe ? "CigerTool OS" : "Windows Uygulaması";
+        ProductTagline = "Klonlama, yedekleme, imaj alma ve USB hazırlığı tek yerde.";
         WindowSubtitle = environmentProfile.IsWinPe
-            ? "Bakım ve kurtarma için sadeleştirilmiş çalışma alanı"
-            : "Günlük kullanım ve servis işlemleri için hazır";
+            ? "Bakım ve kurtarma işlemleri için optimize edilmiş çalışma alanı"
+            : "Günlük kullanım ve servis işlemleri için hazır çalışma alanı";
 
         _pageFactories = new Dictionary<NavigationTarget, Func<object>>
         {
@@ -55,11 +55,11 @@ public sealed class ShellViewModel : ViewModelBase
 
         NavigationItems = new ObservableCollection<NavigationItemViewModel>
         {
-            new(NavigationTarget.Dashboard, "Ana Sayfa", "Özet, öneriler ve son durum", "\uE80F"),
-            new(NavigationTarget.Cloning, "Klonlama", "Diski başka bir diske taşıyın", "\uE7C5"),
+            new(NavigationTarget.Dashboard, "Ana Sayfa", "Durum, öneriler ve son işlemler", "\uE80F"),
+            new(NavigationTarget.Cloning, "Klonlama", "Bir diski başka bir diske taşıyın", "\uE7C5"),
             new(NavigationTarget.BackupImage, "Yedekleme ve İmaj", "İmaj alın, geri yükleyin ve dönüştürün", "\uE823"),
-            new(NavigationTarget.Disks, "Diskler ve Sağlık", "Bağlı diskleri ve durumlarını görün", "\uEDA2"),
-            new(NavigationTarget.UsbCreator, "USB Ortamı Oluştur", "CigerTool OS belleği hazırlayın", "\uE88E"),
+            new(NavigationTarget.Disks, "Diskler ve Sağlık", "Bağlı diskleri ve sağlık durumlarını görün", "\uEDA2"),
+            new(NavigationTarget.UsbCreator, "USB Ortamı Oluştur", "CigerTool OS belleğini hazırlayın", "\uE88E"),
             new(NavigationTarget.Logs, "Günlükler", "İşlem kayıtlarını inceleyin", "\uE9D2"),
             new(NavigationTarget.Settings, "Ayarlar", "Uygulama tercihleri ve destek bilgileri", "\uE713")
         };
@@ -74,7 +74,7 @@ public sealed class ShellViewModel : ViewModelBase
 
         _currentPage = new object();
         _currentPageTitle = "Ana Sayfa";
-        _currentPageSubtitle = "Özet, durum ve sonraki adımlar";
+        _currentPageSubtitle = "Genel durum ve önerilen sonraki adımlar";
 
         Navigate(NavigationTarget.Dashboard);
     }

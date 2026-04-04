@@ -56,7 +56,7 @@
         </StackPanel>
       </Border>
 
-      <Border Style="{StaticResource CardBorderStyle}" Background="#F7FAFB">
+      <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource RaisedSurfaceBrush}">
         <StackPanel>
           <TextBlock FontSize="18"
                      FontWeight="SemiBold"
@@ -70,7 +70,7 @@
       </Border>
 
       <Expander Margin="0,8,0,14"
-                Background="#F7FAFB"
+                Background="{StaticResource RaisedSurfaceBrush}"
                 BorderBrush="{StaticResource CardBorderBrush}"
                 BorderThickness="1"
                 Padding="16"

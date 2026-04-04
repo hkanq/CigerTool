@@ -18,15 +18,17 @@
         TextOptions.TextRenderingMode="ClearType">
   <Grid Margin="18">
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="292" />
+      <ColumnDefinition Width="308" />
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
 
     <Border Grid.Column="0"
-            Margin="0,0,12,0"
+            Margin="0,0,14,0"
             Padding="24,24,18,24"
-            CornerRadius="28"
-            Background="{StaticResource SidebarBrush}">
+            CornerRadius="30"
+            Background="{StaticResource SidebarBrush}"
+            BorderBrush="{StaticResource CardBorderBrush}"
+            BorderThickness="1">
       <Grid>
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
@@ -34,20 +36,42 @@
           <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0">
-          <TextBlock FontSize="34"
-                     FontWeight="SemiBold"
-                     Foreground="{StaticResource SidebarTextBrush}"
-                     Text="{Binding ProductName}" />
-          <TextBlock Margin="0,8,0,0"
-                     FontSize="14"
-                     TextWrapping="Wrap"
-                     Foreground="{StaticResource SidebarMutedTextBrush}"
-                     Text="{Binding ProductTagline}" />
-        </StackPanel>
+        <Grid Grid.Row="0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+
+          <Border Width="56"
+                  Height="56"
+                  VerticalAlignment="Top"
+                  CornerRadius="18"
+                  Background="{StaticResource AccentSoftBrush}"
+                  BorderBrush="{StaticResource AccentBrush}"
+                  BorderThickness="1">
+            <TextBlock VerticalAlignment="Center"
+                       HorizontalAlignment="Center"
+                       FontSize="28"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource AccentBrush}"
+                       Text="C" />
+          </Border>
+
+          <StackPanel Grid.Column="1" Margin="14,0,0,0">
+            <TextBlock FontSize="32"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource SidebarTextBrush}"
+                       Text="{Binding ProductName}" />
+            <TextBlock Margin="0,8,0,0"
+                       FontSize="13"
+                       TextWrapping="Wrap"
+                       Foreground="{StaticResource SidebarMutedTextBrush}"
+                       Text="{Binding ProductTagline}" />
+          </StackPanel>
+        </Grid>
 
         <Border Grid.Row="1"
-                Margin="0,20,0,0"
+                Margin="0,22,0,0"
                 Padding="14,10"
                 CornerRadius="18"
                 Background="{StaticResource SidebarPanelBrush}">
@@ -108,7 +132,7 @@
       </Grid.RowDefinitions>
 
       <Border Padding="24,20"
-              CornerRadius="28"
+              CornerRadius="30"
               Background="{StaticResource ContentSurfaceBrush}"
               BorderBrush="{StaticResource CardBorderBrush}"
               BorderThickness="1">
@@ -137,10 +161,10 @@
                   Padding="14,10"
                   VerticalAlignment="Center"
                   CornerRadius="18"
-                  Background="#EEF2F7">
+                  Background="{StaticResource TagSurfaceBrush}">
             <TextBlock FontSize="12"
                        FontWeight="SemiBold"
-                       Foreground="{StaticResource ContentHeadingBrush}"
+                       Foreground="{StaticResource TagTextBrush}"
                        Text="{Binding EditionLabel}" />
           </Border>
         </Grid>
@@ -149,7 +173,7 @@
       <Border Grid.Row="1"
               Margin="0,18,0,0"
               Padding="8"
-              CornerRadius="28"
+              CornerRadius="30"
               Background="{StaticResource ContentSurfaceBrush}"
               BorderBrush="{StaticResource CardBorderBrush}"
               BorderThickness="1">

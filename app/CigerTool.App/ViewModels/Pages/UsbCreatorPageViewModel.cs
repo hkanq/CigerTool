@@ -32,6 +32,7 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
         _writeImageCommand = new AsyncRelayCommand(_ => WriteImageAsync(), _ => CanWriteImage());
         BrowseManualImageCommand = new AsyncRelayCommand(_ => BrowseManualImageAsync());
         ClearManualImageCommand = new AsyncRelayCommand(_ => ClearManualImageAsync());
+        _ = WarmUpAsync();
     }
 
     public UsbCreatorWorkspaceSnapshot Snapshot
@@ -65,6 +66,12 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
         get => _statusMessage;
         private set => SetProperty(ref _statusMessage, value);
     }
+
+    public bool HasUsbDevices => Snapshot.Devices.Count > 0;
+
+    public string UsbDiscoveryHint => HasUsbDevices
+        ? "Bağlı aygıtın modelini, kapasitesini ve güvenlik durumunu aşağıdan kontrol edin."
+        : "USB aygıtı görünmüyorsa bağlantıyı yenileyin, yönetici yetkisini doğrulayın ve Windows'un aygıtı algıladığından emin olun.";
 
     public ICommand RefreshReleaseCommand => _refreshReleaseCommand;
 
@@ -157,5 +164,22 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
         Snapshot = _usbCreationService.GetSnapshot();
         SelectedDevice = Snapshot.Devices.FirstOrDefault(device => device.Id == previousId)
                          ?? Snapshot.Devices.FirstOrDefault(device => device.CanWrite);
+        RaisePropertyChanged(nameof(HasUsbDevices));
+        RaisePropertyChanged(nameof(UsbDiscoveryHint));
+    }
+
+    private async Task WarmUpAsync()
+    {
+        try
+        {
+            var result = await _usbCreationService.RefreshUsbDevicesAsync();
+            RefreshSnapshot();
+            StatusMessage = result.Message;
+            _writeImageCommand.RaiseCanExecuteChanged();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"USB aygıt listesi açılışta yenilenemedi: {ex.Message}";
+        }
     }
 }

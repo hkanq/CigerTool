@@ -71,7 +71,7 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
 
-      <Border Style="{StaticResource CardBorderStyle}" Background="#F7FAFB">
+      <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource RaisedSurfaceBrush}">
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="2*" />
@@ -128,7 +128,7 @@
       </Border>
 
       <Expander Margin="0,8,0,14"
-                Background="#F7FAFB"
+                Background="{StaticResource RaisedSurfaceBrush}"
                 BorderBrush="{StaticResource CardBorderBrush}"
                 BorderThickness="1"
                 Padding="16"
@@ -206,7 +206,7 @@
       </Border>
 
       <Expander Margin="0,8,0,14"
-                Background="#F7FAFB"
+                Background="{StaticResource RaisedSurfaceBrush}"
                 BorderBrush="{StaticResource CardBorderBrush}"
                 BorderThickness="1"
                 Padding="16"
@@ -241,12 +241,16 @@
           <ComboBox Margin="0,8,0,0"
                     ItemsSource="{Binding Snapshot.Devices}"
                     SelectedItem="{Binding SelectedDevice}"
-                    DisplayMemberPath="DisplayName" />
+                    ItemTemplate="{StaticResource UsbDeviceComboItemTemplate}" />
+          <TextBlock Margin="0,10,0,0"
+                     TextWrapping="Wrap"
+                     Foreground="{StaticResource ContentMutedTextBrush}"
+                     Text="{Binding UsbDiscoveryHint}" />
 
           <Border Margin="0,16,0,0"
                   Padding="14"
                   CornerRadius="16"
-                  Background="#F7FAFB"
+                  Background="{StaticResource SubtlePanelBrush}"
                   BorderBrush="{StaticResource CardBorderBrush}"
                   BorderThickness="1">
             <StackPanel>
@@ -277,7 +281,7 @@
                 <Border Margin="0,0,0,10"
                         Padding="12"
                         CornerRadius="14"
-                        Background="#F7FAFB"
+                        Background="{StaticResource SubtlePanelBrush}"
                         BorderBrush="{StaticResource CardBorderBrush}"
                         BorderThickness="1">
                   <Grid>
@@ -312,7 +316,7 @@
         </StackPanel>
       </Border>
 
-      <Border Style="{StaticResource CardBorderStyle}" Background="#F7FAFB">
+      <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource RaisedSurfaceBrush}">
         <StackPanel>
           <TextBlock FontSize="18"
                      FontWeight="SemiBold"
