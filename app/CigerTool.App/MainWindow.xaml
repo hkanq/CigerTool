@@ -14,7 +14,9 @@
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display"
-        TextOptions.TextRenderingMode="ClearType">
+        TextOptions.TextRenderingMode="ClearType"
+        SourceInitialized="Window_OnSourceInitialized"
+        Loaded="Window_OnLoaded">
   <Grid Margin="14">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="308" />
