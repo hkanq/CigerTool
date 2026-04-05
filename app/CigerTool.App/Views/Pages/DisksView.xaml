@@ -69,7 +69,7 @@
           <TextBlock Margin="0,10,0,0"
                      TextWrapping="Wrap"
                      Foreground="{StaticResource ContentTextBrush}"
-                     Text="Seçilen sürücü için sağlık özetini inceleyebilir ve sıralı ile 4K rastgele testleri başlatabilirsiniz." />
+                     Text="Seçilen sürücü için sağlık özetini inceleyebilir, sıralı okuma-yazma ve 4K rastgele testleri çalıştırabilirsiniz." />
 
           <Grid Margin="0,16,0,0">
             <Grid.ColumnDefinitions>
@@ -94,9 +94,8 @@
             </StackPanel>
           </Grid>
 
-          <StackPanel Margin="0,14,0,0"
-                      Orientation="Horizontal">
-            <Button Width="180"
+          <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
+            <Button Width="190"
                     Height="44"
                     Command="{Binding StartBenchmarkCommand}"
                     Content="Performans testini başlat"
@@ -128,65 +127,79 @@
                   Background="{StaticResource SubtlePanelBrush}"
                   BorderBrush="{StaticResource CardBorderBrush}"
                   BorderThickness="1">
-            <Grid>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="*" />
-              </Grid.ColumnDefinitions>
-              <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-              </Grid.RowDefinitions>
+            <StackPanel>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-              <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Durum" />
-              <TextBlock Grid.Column="1"
-                         Foreground="{StaticResource ContentMutedTextBrush}"
-                         Text="Sıralı okuma / yazma" />
-              <TextBlock Grid.Column="2"
-                         Foreground="{StaticResource ContentMutedTextBrush}"
-                         Text="4K rastgele okuma / yazma" />
+                <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Durum" />
+                <TextBlock Grid.Column="1"
+                           Foreground="{StaticResource ContentMutedTextBrush}"
+                           Text="Sıralı okuma / yazma" />
+                <TextBlock Grid.Column="2"
+                           Foreground="{StaticResource ContentMutedTextBrush}"
+                           Text="4K rastgele okuma / yazma" />
 
-              <TextBlock Grid.Row="1"
-                         Margin="0,6,0,0"
-                         FontWeight="SemiBold"
-                         Foreground="{StaticResource ContentHeadingBrush}"
-                         Text="{Binding LastBenchmarkResult.StatusLabel, TargetNullValue=Henüz test sonucu yok}" />
-              <TextBlock Grid.Row="1"
-                         Grid.Column="1"
-                         Margin="0,6,0,0"
-                         Foreground="{StaticResource ContentHeadingBrush}"
-                         Text="{Binding LastBenchmarkResult.SequentialReadLabel, TargetNullValue=-}" />
-              <TextBlock Grid.Row="1"
-                         Grid.Column="2"
-                         Margin="0,6,0,0"
-                         Foreground="{StaticResource ContentHeadingBrush}"
-                         Text="{Binding LastBenchmarkResult.RandomReadLabel, TargetNullValue=-}" />
+                <TextBlock Grid.Row="1"
+                           Margin="0,6,0,0"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource ContentHeadingBrush}"
+                           Text="{Binding LastBenchmarkResult.StatusLabel, TargetNullValue=Henüz test sonucu yok}" />
+                <TextBlock Grid.Row="1"
+                           Grid.Column="1"
+                           Margin="0,6,0,0"
+                           Foreground="{StaticResource ContentHeadingBrush}"
+                           Text="{Binding LastBenchmarkResult.SequentialReadLabel, TargetNullValue=-}" />
+                <TextBlock Grid.Row="1"
+                           Grid.Column="2"
+                           Margin="0,6,0,0"
+                           Foreground="{StaticResource ContentHeadingBrush}"
+                           Text="{Binding LastBenchmarkResult.RandomReadLabel, TargetNullValue=-}" />
 
-              <TextBlock Grid.Row="2"
-                         Margin="0,6,0,0"
-                         TextWrapping="Wrap"
-                         Foreground="{StaticResource ContentTextBrush}"
-                         Text="{Binding LastBenchmarkResult.Summary, TargetNullValue=Test tamamlandığında özet burada görünür.}" />
-              <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,6,0,0">
-                <TextBlock Foreground="{StaticResource ContentTextBrush}"
-                           Text="{Binding LastBenchmarkResult.SequentialWriteLabel, TargetNullValue=-}" />
-                <TextBlock Margin="0,4,0,0"
-                           Foreground="{StaticResource ContentMutedTextBrush}"
-                           Text="{Binding LastBenchmarkResult.TestFileSizeLabel, TargetNullValue=-}" />
-              </StackPanel>
-              <StackPanel Grid.Row="2" Grid.Column="2" Margin="0,6,0,0">
-                <TextBlock Foreground="{StaticResource ContentTextBrush}"
-                           Text="{Binding LastBenchmarkResult.RandomWriteLabel, TargetNullValue=-}" />
-                <TextBlock Margin="0,4,0,0"
-                           Foreground="{StaticResource ContentMutedTextBrush}"
-                           Text="{Binding LastBenchmarkResult.RandomReadIopsLabel, TargetNullValue=-}" />
-                <TextBlock Margin="0,4,0,0"
-                           Foreground="{StaticResource ContentMutedTextBrush}"
-                           Text="{Binding LastBenchmarkResult.RandomWriteIopsLabel, TargetNullValue=-}" />
-              </StackPanel>
-            </Grid>
+                <TextBlock Grid.Row="2"
+                           Margin="0,6,0,0"
+                           TextWrapping="Wrap"
+                           Foreground="{StaticResource ContentTextBrush}"
+                           Text="{Binding LastBenchmarkResult.Summary, TargetNullValue=Test tamamlandığında özet burada görünür.}" />
+                <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,6,0,0">
+                  <TextBlock Foreground="{StaticResource ContentTextBrush}"
+                             Text="{Binding LastBenchmarkResult.SequentialWriteLabel, TargetNullValue=-}" />
+                  <TextBlock Margin="0,4,0,0"
+                             Foreground="{StaticResource ContentMutedTextBrush}"
+                             Text="{Binding LastBenchmarkResult.TestFileSizeLabel, TargetNullValue=-}" />
+                </StackPanel>
+                <StackPanel Grid.Row="2" Grid.Column="2" Margin="0,6,0,0">
+                  <TextBlock Foreground="{StaticResource ContentTextBrush}"
+                             Text="{Binding LastBenchmarkResult.RandomWriteLabel, TargetNullValue=-}" />
+                  <TextBlock Margin="0,4,0,0"
+                             Foreground="{StaticResource ContentMutedTextBrush}"
+                             Text="{Binding LastBenchmarkResult.RandomReadIopsLabel, TargetNullValue=-}" />
+                  <TextBlock Margin="0,4,0,0"
+                             Foreground="{StaticResource ContentMutedTextBrush}"
+                             Text="{Binding LastBenchmarkResult.RandomWriteIopsLabel, TargetNullValue=-}" />
+                </StackPanel>
+              </Grid>
+
+              <ItemsControl Margin="0,12,0,0"
+                            ItemsSource="{Binding LastBenchmarkResult.Notes}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Margin="0,0,0,8"
+                               TextWrapping="Wrap"
+                               Foreground="{StaticResource ContentMutedTextBrush}"
+                               Text="{Binding}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
           </Border>
         </StackPanel>
       </Border>
@@ -245,7 +258,7 @@
 
                 <Grid Margin="0,10,0,0">
                   <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.2*" />
+                    <ColumnDefinition Width="1.4*" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
@@ -260,17 +273,17 @@
                   </StackPanel>
 
                   <StackPanel Grid.Column="1">
+                    <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Sağlık" />
+                    <TextBlock Margin="0,4,0,0"
+                               Foreground="{StaticResource ContentHeadingBrush}"
+                               Text="{Binding HealthLabel}" />
+                  </StackPanel>
+
+                  <StackPanel Grid.Column="2">
                     <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Toplam" />
                     <TextBlock Margin="0,4,0,0"
                                Foreground="{StaticResource ContentHeadingBrush}"
                                Text="{Binding CapacityLabel}" />
-                  </StackPanel>
-
-                  <StackPanel Grid.Column="2">
-                    <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Kullanılan" />
-                    <TextBlock Margin="0,4,0,0"
-                               Foreground="{StaticResource ContentHeadingBrush}"
-                               Text="{Binding UsedLabel}" />
                   </StackPanel>
 
                   <StackPanel Grid.Column="3">
@@ -278,6 +291,27 @@
                     <TextBlock Margin="0,4,0,0"
                                Foreground="{StaticResource ContentHeadingBrush}"
                                Text="{Binding FreeLabel}" />
+                  </StackPanel>
+                </Grid>
+
+                <Grid Margin="0,10,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+
+                  <StackPanel>
+                    <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Kullanılan" />
+                    <TextBlock Margin="0,4,0,0"
+                               Foreground="{StaticResource ContentHeadingBrush}"
+                               Text="{Binding UsedLabel}" />
+                  </StackPanel>
+
+                  <StackPanel Grid.Column="1">
+                    <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Yerleşim" />
+                    <TextBlock Margin="0,4,0,0"
+                               Foreground="{StaticResource ContentHeadingBrush}"
+                               Text="{Binding LayoutLabel}" />
                   </StackPanel>
                 </Grid>
 

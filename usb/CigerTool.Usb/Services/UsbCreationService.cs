@@ -79,12 +79,14 @@ public sealed class UsbCreationService : IUsbCreationService
         var settings = _settingsService.GetSettings();
         var imageSizeBytes = ResolveImageSizeBytes(releaseSummary, preparedImagePath);
         var isAdministrator = _rawDiskWriter.IsAdministrator();
+        var preparedMediaProfile = AnalyzePreparedMedia(releaseSummary, preparedImagePath);
         var deviceEntries = devices.Select(device => ToDeviceEntry(device, imageSizeBytes)).ToArray();
         var eligibleCount = deviceEntries.Count(device => device.CanWrite);
         var hasPreparedImage = !string.IsNullOrWhiteSpace(preparedImagePath) && File.Exists(preparedImagePath);
         var canWriteFromCurrentState = isAdministrator &&
                                       hasPreparedImage &&
                                       eligibleCount > 0 &&
+                                      preparedMediaProfile.CanDirectWrite &&
                                       checksumState is not (ChecksumVerificationState.Mismatch or ChecksumVerificationState.Failed);
 
         return new UsbCreatorWorkspaceSnapshot(
@@ -101,6 +103,7 @@ public sealed class UsbCreationService : IUsbCreationService
                 new CardMetric("Kurulum kaynağı", releaseSummary.ModeLabel, releaseSummary.SourceDescription),
                 new CardMetric("Sürüm", releaseSummary.Version, releaseSummary.ImageName),
                 new CardMetric("Hazır imaj", hasPreparedImage ? "Hazır" : "Hazır değil", preparedImagePath ?? "Henüz indirilen veya seçilen bir imaj yok."),
+                new CardMetric("Önyükleme profili", preparedMediaProfile.BootProfileLabel, preparedMediaProfile.CompatibilityLabel),
                 new CardMetric("Bütünlük", FormatChecksumState(checksumState), checksumStatus),
                 new CardMetric("USB aygıtı", devices.Count.ToString(), $"{eligibleCount} aygıt yazma için uygun görünüyor."),
                 new CardMetric("Yönetici yetkisi", isAdministrator ? "Açık" : "Kapalı", isAdministrator ? "Raw yazma izinleri kullanılabilir." : "USB yazmak için uygulamayı yönetici olarak açın.")
@@ -110,7 +113,8 @@ public sealed class UsbCreationService : IUsbCreationService
                 "Bu bölüm işletim sistemi üretmez; yalnızca hazır CigerTool OS imajını indirir veya kullanır.",
                 "Kaynak sırası: elle seçilen dosya, yerel geçersiz kılma, ardından çevrimiçi yayın bilgisi.",
                 "Bütünlük doğrulaması başarısızsa yazma işlemi başlatılmaz.",
-                "Sistem diski ve küçük kapasiteli aygıtlar güvenlik için engellenir."
+                "Sistem diski ve küçük kapasiteli aygıtlar güvenlik için engellenir.",
+                preparedMediaProfile.CompatibilityDetails
             ],
             Release: new UsbReleaseInfo(
                 ModeLabel: releaseSummary.ModeLabel,
@@ -121,6 +125,12 @@ public sealed class UsbCreationService : IUsbCreationService
                 ImageName: releaseSummary.ImageName,
                 ImageSizeLabel: imageSizeBytes > 0 ? FormatBytes(imageSizeBytes) : "Bilinmiyor",
                 Notes: releaseSummary.Notes,
+                SourceFormatLabel: preparedMediaProfile.SourceFormatLabel,
+                BootProfileLabel: preparedMediaProfile.BootProfileLabel,
+                WriteModeLabel: preparedMediaProfile.WriteModeLabel,
+                CompatibilityLabel: preparedMediaProfile.CompatibilityLabel,
+                CompatibilityDetails: preparedMediaProfile.CompatibilityDetails,
+                CanDirectWrite: preparedMediaProfile.CanDirectWrite,
                 ImageUrl: releaseSummary.ImageUrl,
                 PreparedImagePath: preparedImagePath,
                 ExpectedSha256: expectedSha256,
@@ -534,6 +544,29 @@ public sealed class UsbCreationService : IUsbCreationService
             return new UsbCreatorOperationResult(false, OperationSeverity.Warning, "USB belleğe yazılacak imaj hazır değil.");
         }
 
+        ReleaseManifestSummary releaseSummary;
+        lock (_sync)
+        {
+            releaseSummary = _releaseSummary;
+        }
+
+        var mediaProfile = AnalyzePreparedMedia(releaseSummary, imagePath);
+        if (!mediaProfile.CanDirectWrite)
+        {
+            _operationLogService.Record(
+                OperationSeverity.Warning,
+                "USB Oluşturma",
+                "Seçilen imaj doğrudan USB'ye yazılamıyor.",
+                "usb.write.unsupported_profile",
+                new Dictionary<string, string>
+                {
+                    ["image"] = imagePath,
+                    ["profile"] = mediaProfile.BootProfileLabel
+                });
+
+            return new UsbCreatorOperationResult(false, OperationSeverity.Warning, mediaProfile.CompatibilityDetails);
+        }
+
         var device = GetDeviceById(usbDeviceId);
         if (device is null)
         {
@@ -750,6 +783,140 @@ public sealed class UsbCreationService : IUsbCreationService
         return releaseSummary.SizeBytes ?? 0L;
     }
 
+    private static PreparedMediaProfile AnalyzePreparedMedia(ReleaseManifestSummary releaseSummary, string? preparedImagePath)
+    {
+        var referencePath = !string.IsNullOrWhiteSpace(preparedImagePath)
+            ? preparedImagePath
+            : !string.IsNullOrWhiteSpace(releaseSummary.LocalImagePath)
+                ? releaseSummary.LocalImagePath
+                : releaseSummary.ImageName;
+
+        var extension = Path.GetExtension(referencePath ?? string.Empty).ToLowerInvariant();
+        var imageName = !string.IsNullOrWhiteSpace(releaseSummary.ImageName)
+            ? releaseSummary.ImageName
+            : Path.GetFileName(referencePath);
+        var sourceDescription = string.IsNullOrWhiteSpace(imageName) ? "Hazır imaj" : imageName;
+
+        return extension switch
+        {
+            ".img" or ".bin" or ".raw" => new PreparedMediaProfile(
+                SourceFormatLabel: "Disk imajı",
+                BootProfileLabel: IsCigerToolImage(sourceDescription) ? "CigerTool OS disk imajı" : "Ham disk imajı",
+                WriteModeLabel: "Doğrudan sektör kopyası",
+                CompatibilityLabel: "Bu imaj doğrudan USB'ye yazılabilir.",
+                CompatibilityDetails: "Seçilen imaj sektör düzeyinde yazılabilir. Uygulama önce bütünlüğü doğrular, sonra diske yazar ve geri okuma ile sonucu yeniden kontrol eder.",
+                CanDirectWrite: true),
+            ".iso" => AnalyzeIsoProfile(preparedImagePath, sourceDescription),
+            ".wim" => new PreparedMediaProfile(
+                SourceFormatLabel: "WIM imajı",
+                BootProfileLabel: "Windows imaj paketi",
+                WriteModeLabel: "Hazırlık gerekir",
+                CompatibilityLabel: "WIM dosyası doğrudan USB'ye yazılamaz.",
+                CompatibilityDetails: "WIM dosyaları tek başına önyüklenebilir USB oluşturmaz. Bu dosya için bölüm hazırlama ve önyükleme dosyası yerleştirme katmanı gerekir; bu akış henüz tamamlanmadı.",
+                CanDirectWrite: false),
+            "" => new PreparedMediaProfile(
+                SourceFormatLabel: "Hazır kaynak bekleniyor",
+                BootProfileLabel: "Kaynak analizi bekleniyor",
+                WriteModeLabel: "İndirme veya seçim bekleniyor",
+                CompatibilityLabel: "Kaynak dosya hazır olduğunda yazma profili netleşir.",
+                CompatibilityDetails: "Önce imajı indirin veya yerel dosya seçin. Dosya hazır olduğunda USB'ye doğrudan yazılıp yazılamadığı otomatik olarak denetlenir.",
+                CanDirectWrite: false),
+            _ => new PreparedMediaProfile(
+                SourceFormatLabel: "Bilinmeyen biçim",
+                BootProfileLabel: "Destek sınırı dışında",
+                WriteModeLabel: "Özel hazırlık gerekir",
+                CompatibilityLabel: "Bu dosya türü şu an doğrudan USB'ye yazılamıyor.",
+                CompatibilityDetails: "Desteklenmeyen veya tanınmayan dosya türü seçildi. Şu anda disk imajları ve hibrit ISO dosyaları doğrudan yazılabiliyor.",
+                CanDirectWrite: false)
+        };
+    }
+
+    private static PreparedMediaProfile AnalyzeIsoProfile(string? preparedImagePath, string sourceDescription)
+    {
+        if (!string.IsNullOrWhiteSpace(preparedImagePath) && File.Exists(preparedImagePath))
+        {
+            if (LooksLikeHybridIso(preparedImagePath))
+            {
+                return new PreparedMediaProfile(
+                    SourceFormatLabel: "ISO",
+                    BootProfileLabel: IsCigerToolImage(sourceDescription) ? "CigerTool OS hibrit ISO" : "Hibrit önyüklenebilir ISO",
+                    WriteModeLabel: "Doğrudan sektör kopyası",
+                    CompatibilityLabel: "Bu ISO doğrudan USB'ye yazılabilir.",
+                    CompatibilityDetails: "ISO dosyasında disk imajı imzası bulundu. Uygulama bu kalıbı disk düzeyinde yazar, ardından geri okuma ile bütünlüğü denetler.",
+                    CanDirectWrite: true);
+            }
+
+            return new PreparedMediaProfile(
+                SourceFormatLabel: "ISO",
+                BootProfileLabel: "Standart ISO",
+                WriteModeLabel: "Dosya çıkarma gerekir",
+                CompatibilityLabel: "Bu ISO için gelişmiş hazırlık gerekir.",
+                CompatibilityDetails: "Seçilen ISO doğrudan sektör kopyasıyla yazılabilecek hibrit bir kalıp değil. Rufus benzeri bölüm hazırlama, dosya kopyalama ve önyükleme profili katmanı henüz tüm senaryolar için tamamlanmadı.",
+                CanDirectWrite: false);
+        }
+
+        return new PreparedMediaProfile(
+            SourceFormatLabel: "ISO",
+            BootProfileLabel: "ISO (indirildikten sonra doğrulanacak)",
+            WriteModeLabel: "Profil analizi bekleniyor",
+            CompatibilityLabel: "Bu ISO'nun doğrudan yazma uyumluluğu indirildikten sonra kontrol edilecek.",
+            CompatibilityDetails: "ISO dosyası yerelde incelendiğinde hibrit önyükleme imzası aranır. Hibrit ISO ise doğrudan yazılır; standart ISO ise ek hazırlık gerektiği açıkça belirtilir.",
+            CanDirectWrite: false);
+    }
+
+    private static bool LooksLikeHybridIso(string imagePath)
+    {
+        try
+        {
+            using var stream = new FileStream(imagePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            if (stream.Length < 1024)
+            {
+                return false;
+            }
+
+            var sector0 = new byte[512];
+            if (stream.Read(sector0, 0, sector0.Length) == sector0.Length)
+            {
+                var hasMbrSignature = sector0[510] == 0x55 && sector0[511] == 0xAA;
+                if (hasMbrSignature)
+                {
+                    for (var offset = 446; offset < 510; offset += 16)
+                    {
+                        if (sector0[offset + 4] != 0)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            stream.Position = 512;
+            var sector1 = new byte[512];
+            if (stream.Read(sector1, 0, sector1.Length) == sector1.Length)
+            {
+                return sector1[0] == (byte)'E' &&
+                       sector1[1] == (byte)'F' &&
+                       sector1[2] == (byte)'I' &&
+                       sector1[3] == (byte)' ' &&
+                       sector1[4] == (byte)'P' &&
+                       sector1[5] == (byte)'A' &&
+                       sector1[6] == (byte)'R' &&
+                       sector1[7] == (byte)'T';
+            }
+        }
+        catch
+        {
+        }
+
+        return false;
+    }
+
+    private static bool IsCigerToolImage(string? sourceDescription)
+    {
+        return !string.IsNullOrWhiteSpace(sourceDescription) &&
+               sourceDescription.Contains("cigertool", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string FormatBytes(long bytes)
     {
         if (bytes <= 0)
@@ -948,4 +1115,12 @@ public sealed class UsbCreationService : IUsbCreationService
             return Array.Empty<UsbPhysicalDeviceInfo>();
         }
     }
+
+    private sealed record PreparedMediaProfile(
+        string SourceFormatLabel,
+        string BootProfileLabel,
+        string WriteModeLabel,
+        string CompatibilityLabel,
+        string CompatibilityDetails,
+        bool CanDirectWrite);
 }

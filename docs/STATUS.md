@@ -2,82 +2,86 @@
 
 ## Son Tur Özeti
 
-Bu turda şu başlıklar tamamlandı:
+Bu turda üç kritik alan birlikte kapatıldı:
 
-- pencere kabuğu standart Windows başlık çubuğu davranışına geri alındı
-- `USB Ortamı Oluştur` akışı kaynak sorgulama, hedef denetimi, indirme, yazma, doğrulama ve iptal yönetimiyle sadeleştirildi
-- USB indirme ve yazma katmanına gerçek ilerleme bildirimi eklendi
-- test projelerindeki Windows platform uyarıları kapatıldı
-- çözüm `0 uyarı / 0 hata` ile derlendi, testlerden geçti ve iki yayın çıktısı yeniden üretildi
+- tam ekrana geçince sağ ve alt kenarda boşluk bırakan pencere davranışı düzeltildi
+- USB modülüne gerçek yazma profili analizi eklendi
+- disk sağlığı ve benchmark yüzeyi daha görünür ve daha dürüst hale getirildi
 
-## Güncel Aşama
+## Bu Turda Tamamlananlar
 
-Bu turda ürün yüzeyi ve temel kullanım güvenilirliği birlikte güçlendirildi:
+### Pencere kabuğu
 
-- tüm uygulama koyu temaya taşındı
-- seçim kutuları ve kaydırma çubukları daha modern hale getirildi
-- uygulama her zaman yönetici yetkisi isteyecek şekilde sabitlendi
-- USB aygıt algılama tarafı daha toleranslı hale getirildi
-- yedekleme denetiminde başarısızlık nedenleri kullanıcıya daha açık gösterilmeye başlandı
+- pencere artık maksimum boyutta dış boşluk bırakmaması için normal ve tam ekran durumlarını ayrı ele alıyor
+- başlangıç yerleşimi görünür çalışma alanına göre zorlanıyor
+- maksimum durumdayken dış yerleşim boşluğu kaldırılıyor
 
-## Bu Turda Yapılanlar
+### USB Ortamı Oluştur
 
-- sol menü ve genel yüzey için koyu tema fırçaları tamamlandı
-- kaba görünen kalın kaydırma çubukları inceltildi ve yuvarlatıldı
-- seçim kutuları daha modern, koyu ve açıklamalı hale getirildi
-- sürücü seçim kutularında model, kapasite ve sağlık özeti görünümü korundu
-- USB aygıtı seçimi açılır kutusu daha zengin özet göstermeye başladı
-- uygulama manifesti `requireAdministrator` düzeyine çekildi
-- USB ekranı açılır açılmaz aygıt taraması başlatılmaya başladı
-- USB aygıt algılama servisi modern depolama sorgusu ile eski WMI bilgisini birleştiren daha güçlü bir taramaya geçirildi
-- varsayılan yayın manifest adresi GitHub `raw` yolu üzerinden sabitlendi
-- GitHub `blob` adresi verilirse onu `raw` adresine dönüştüren davranış korundu
-- yedekleme denetimi başarısızsa ilk kritik neden özet metnine de taşındı
+- kaynak açılışta otomatik yenileniyor
+- USB aygıtları açılışta otomatik taranıyor
+- indirme, yazma ve doğrulama akışları tek sayfada ve ilerleme takibiyle yönetiliyor
+- kaynak için gerçek yazma profili analizi eklendi
 
-## Yayın Çıktıları
+Bugün gerçekten doğrudan yazılabilen kaynaklar:
 
-- [artifacts/app/CigerTool.exe](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/artifacts/app/CigerTool.exe)
-- [artifacts/winpe/CigerTool.WinPE.exe](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/artifacts/winpe/CigerTool.WinPE.exe)
+- `.img`
+- `.bin`
+- `.raw`
+- hibrit önyüklenebilir `.iso`
 
-## Davranış Notları
+Bugün henüz tam kapsama ulaşmayan USB senaryoları:
 
-- her iki yayın çıktısı da açılış için zorunlu yan dosya gerektirmez
-- her iki yayın da yönetici yetkisi ister
-- masaüstü yapısı yazılabilir verileri `%LocalAppData%\CigerTool` altında tutar
-- WinPE odaklı yapı yazılabilir verileri `%TEMP%\CigerTool` altında tutar
-- uygulama klasörü içine günlük veya veri klasörü açma önceliği yoktur
+- standart ISO için Rufus benzeri bölüm hazırlama ve dosya kopyalama akışı
+- çoklu önyükleme profilleri
+- canlı işletim sistemi USB profillerinin tamamı
 
-## Ürün Yönü Notu
+### Diskler ve Sağlık
 
-Kullanıcı talebine göre ürün hedefi genişletildi:
+- disk listesinde sağlık alanı daha açık hale getirildi
+- marka / model, medya tipi ve sağlık bir arada daha görünür gösteriliyor
+- Windows depolama sağlığına ek olarak arıza öngörüsü sinyali bulunursa uyarı özetine taşınıyor
+- benchmark alanına derin test profili eklendi
+- benchmark sonuçlarına yorumlayıcı notlar eklendi
 
-- tam disk akıllı imaj
-- ISO yazma
-- Rufus benzeri USB hazırlama kapsamı
-- USB üzerinden çalışan servis sistemi akışları
-- daha zengin disk sağlık ve performans araçları
+## Dürüst Kapsam Notu
 
-Bu noktada önemli ayrım şudur:
+Bu turda ürün daha güçlü hale geldi, ancak aşağıdakiler hâlâ yüzde yüz tamamlanmış gibi sunulmaz:
 
-- tam disk akıllı imaj, disk imajı alanıdır ve yerel imaj biçimiyle ele alınacaktır
-- ISO yazma, önyüklenebilir medya hazırlama alanıdır
+- Rufus ile bire bir tüm ISO ve boot senaryoları
+- CrystalDiskInfo ile bire bir tüm SMART ve üretici telemetrisi
+- CrystalDiskMark ile bire bir tüm test profilleri ve rapor yapısı
 
-Bu nedenle `akıllı disk yedeği` ile `ISO yazma` aynı başlık altında karıştırılmayacaktır.
+Bugün gelinen gerçek durum:
+
+- hibrit ISO ve ham disk imajlarında gerçek yazma desteği var
+- disk benchmark katmanı sıralı ve 4K rastgele yerel test sunuyor
+- sağlık katmanı Windows depolama durumu ve temel arıza öngörüsü sinyalini sunuyor
+
+## Doğrulanan Çıktılar
+
+Bu turda gerçekten doğrulanan yeni build çıktıları:
+
+- [CigerTool.exe](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/artifacts/final/app/CigerTool.exe)
+- [CigerTool.WinPE.exe](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/artifacts/final/winpe/CigerTool.WinPE.exe)
+
+Eski [artifacts/winpe](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/artifacts/winpe) içindeki WinPE çıktısı açık olduğu için bu turdaki yeni doğrulanmış build’ler `artifacts/final` altında üretildi.
 
 ## Doğrulama
 
-Bu tur sonunda yeniden çalıştırılması gereken doğrulamalar:
+Bu tur sonunda başarılı geçen komutlar:
 
 - `dotnet build CigerTool.sln -c Release`
 - `dotnet test CigerTool.sln -c Release --no-build`
-- `powershell -ExecutionPolicy Bypass -File build/scripts/Publish-CigerTool.ps1`
+- `dotnet publish app/CigerTool.App/CigerTool.App.csproj -c Release -p:PublishProfile=standard-x64-single-file -p:PublishDir=...artifacts/final/app/`
+- `dotnet publish app/CigerTool.App/CigerTool.App.csproj -c Release -p:PublishProfile=winpe-x64-single-file -p:PublishDir=...artifacts/final/winpe/`
 
 ## Bilinen Kalan Riskler
 
-- USB köprü denetleyicileri ve farklı harici disk kutuları üzerinde daha geniş fiziksel test gerekir
-- tam kapsamlı ISO yazma ve gelişmiş önyükleme profilleri henüz açılmadı
-- tam disk akıllı imaj kapsamı henüz tüm bölüm düzeni senaryolarını taşımıyor
-- gelişmiş SMART telemetrisi ve yerel benchmark katmanı henüz temel seviyenin üzerinde değil
+- standart ISO dosyaları için gelişmiş USB hazırlama katmanı henüz tam değil
+- üreticiye özel SMART ayrıntıları hâlâ sınırlı
+- gerçek donanım çeşitliliğinde USB köprü denetleyicileri için daha geniş test gerekli
+- çalışan eski WinPE build’i açıkken aynı dosya yolunun üzerine yeni publish alınamıyor
 
 ## Bilinçli Ürün Sınırı
 

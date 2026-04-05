@@ -19,7 +19,7 @@
             <TextBlock Margin="0,10,0,0"
                        TextWrapping="Wrap"
                        Foreground="{StaticResource ContentTextBrush}"
-                       Text="CigerTool OS imajını otomatik sorgulayın, uygun USB hedefini seçin ve tek akışta indirme ile yazma işlemini tamamlayın." />
+                       Text="CigerTool OS kaynağını otomatik sorgulayın, uygun USB hedefini seçin ve indirme ile yazma işlemini tek akışta tamamlayın." />
             <TextBlock Margin="0,12,0,0"
                        Foreground="{StaticResource ContentMutedTextBrush}"
                        Text="{Binding StatusMessage}" />
@@ -111,6 +111,7 @@
                            FontWeight="SemiBold"
                            Foreground="{StaticResource ContentHeadingBrush}"
                            Text="{Binding Snapshot.Release.ModeLabel}" />
+
                 <TextBlock Margin="0,12,0,0"
                            Foreground="{StaticResource ContentMutedTextBrush}"
                            Text="Sürüm" />
@@ -118,6 +119,40 @@
                            FontWeight="SemiBold"
                            Foreground="{StaticResource ContentHeadingBrush}"
                            Text="{Binding Snapshot.Release.Version}" />
+
+                <TextBlock Margin="0,12,0,0"
+                           Foreground="{StaticResource ContentMutedTextBrush}"
+                           Text="Kaynak biçimi" />
+                <TextBlock Margin="0,6,0,0"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource ContentHeadingBrush}"
+                           Text="{Binding Snapshot.Release.SourceFormatLabel}" />
+
+                <TextBlock Margin="0,12,0,0"
+                           Foreground="{StaticResource ContentMutedTextBrush}"
+                           Text="Önyükleme profili" />
+                <TextBlock Margin="0,6,0,0"
+                           TextWrapping="Wrap"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource ContentHeadingBrush}"
+                           Text="{Binding Snapshot.Release.BootProfileLabel}" />
+
+                <TextBlock Margin="0,12,0,0"
+                           Foreground="{StaticResource ContentMutedTextBrush}"
+                           Text="Yazma yöntemi" />
+                <TextBlock Margin="0,6,0,0"
+                           TextWrapping="Wrap"
+                           Foreground="{StaticResource ContentHeadingBrush}"
+                           Text="{Binding Snapshot.Release.WriteModeLabel}" />
+
+                <TextBlock Margin="0,12,0,0"
+                           Foreground="{StaticResource ContentMutedTextBrush}"
+                           Text="Uyumluluk" />
+                <TextBlock Margin="0,6,0,0"
+                           TextWrapping="Wrap"
+                           Foreground="{StaticResource ContentTextBrush}"
+                           Text="{Binding Snapshot.Release.CompatibilityLabel}" />
+
                 <TextBlock Margin="0,12,0,0"
                            Foreground="{StaticResource ContentMutedTextBrush}"
                            Text="İmaj" />
@@ -181,6 +216,11 @@
                      TextWrapping="Wrap"
                      Foreground="{StaticResource ContentTextBrush}"
                      Text="{Binding UsbDiscoveryHint}" />
+
+          <TextBlock Margin="0,12,0,0"
+                     TextWrapping="Wrap"
+                     Foreground="{StaticResource ContentMutedTextBrush}"
+                     Text="{Binding Snapshot.Release.CompatibilityDetails}" />
 
           <TextBlock Margin="0,16,0,0"
                      Foreground="{StaticResource ContentMutedTextBrush}"
@@ -262,7 +302,7 @@
                 BorderBrush="{StaticResource CardBorderBrush}"
                 BorderThickness="1"
                 Padding="16"
-                Header="Ayrıntılar"
+                Header="Teknik ayrıntılar"
                 IsExpanded="False">
         <StackPanel Margin="0,12,0,0">
           <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Kaynak açıklaması" />
@@ -278,6 +318,14 @@
                      TextWrapping="Wrap"
                      Foreground="{StaticResource ContentTextBrush}"
                      Text="{Binding Snapshot.Release.ImageUrl, TargetNullValue=Bu kaynakta doğrudan indirme adresi kullanılmıyor.}" />
+
+          <TextBlock Margin="0,12,0,0"
+                     Foreground="{StaticResource ContentMutedTextBrush}"
+                     Text="Hazır imaj yolu" />
+          <TextBlock Margin="0,6,0,0"
+                     TextWrapping="Wrap"
+                     Foreground="{StaticResource ContentTextBrush}"
+                     Text="{Binding Snapshot.Release.PreparedImagePath, TargetNullValue=Henüz yerel imaj yolu yok.}" />
 
           <TextBlock Margin="0,12,0,0"
                      Foreground="{StaticResource ContentMutedTextBrush}"

@@ -13,6 +13,7 @@ namespace CigerTool.Infrastructure.Disks;
 public sealed class RuntimeDiskInventoryService(IOperationLogService operationLogService) : IDiskInventoryService
 {
     private const string StorageNamespace = @"ROOT\Microsoft\Windows\Storage";
+    private const string SmartNamespace = @"ROOT\WMI";
 
     public DiskWorkspaceSnapshot GetSnapshot()
     {
@@ -123,6 +124,7 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
         IReadOnlyDictionary<int, StorageDiskRecord> storageRecords,
         IReadOnlyList<PhysicalDiskRecord> physicalRecords)
     {
+        var smartRecords = QuerySmartStatusRecords();
         var result = new List<DriveMapping>();
 
         foreach (var drive in DriveInfo.GetDrives())
@@ -143,6 +145,7 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
 
                 storageRecords.TryGetValue(win32Record.Index, out var storageRecord);
                 var physicalRecord = MatchPhysicalRecord(win32Record, physicalRecords);
+                var smartRecord = MatchSmartRecord(win32Record, physicalRecord, smartRecords);
 
                 result.Add(new DriveMapping(
                     DriveLetter: driveLetter,
@@ -159,7 +162,9 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
                     OperationalStatus: FirstNonEmpty(storageRecord?.OperationalStatusLabel, physicalRecord?.OperationalStatusLabel, "Bilinmiyor"),
                     IsRemovable: drive.DriveType == DriveType.Removable || ResolveBusTypeLabel(storageRecord?.BusTypeCode, win32Record.InterfaceType).Contains("USB", StringComparison.OrdinalIgnoreCase),
                     Index: win32Record.Index,
-                    IsBootOrSystem: storageRecord?.IsSystem == true || storageRecord?.IsBoot == true || string.Equals(driveLetter, systemDrive, StringComparison.OrdinalIgnoreCase)));
+                    IsBootOrSystem: storageRecord?.IsSystem == true || storageRecord?.IsBoot == true || string.Equals(driveLetter, systemDrive, StringComparison.OrdinalIgnoreCase),
+                    PredictFailure: smartRecord?.PredictFailure == true,
+                    SmartReason: smartRecord?.ReasonLabel));
             }
             catch (Exception ex)
             {
@@ -182,7 +187,7 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
     private static Win32DiskRecord? FindWin32RecordForDrive(string driveLetter)
     {
         using var diskSearcher = new ManagementObjectSearcher(
-            "SELECT DeviceID, Model, InterfaceType, MediaType, Index, Status FROM Win32_DiskDrive");
+            "SELECT DeviceID, Model, InterfaceType, MediaType, Index, Status, PNPDeviceID FROM Win32_DiskDrive");
 
         foreach (ManagementObject disk in diskSearcher.Get())
         {
@@ -225,7 +230,8 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
                                     Model: disk["Model"]?.ToString() ?? "Bilinmeyen aygıt",
                                     InterfaceType: disk["InterfaceType"]?.ToString() ?? "Bilinmiyor",
                                     MediaType: disk["MediaType"]?.ToString() ?? "Bilinmiyor",
-                                    Status: disk["Status"]?.ToString() ?? "Bilinmiyor");
+                                    Status: disk["Status"]?.ToString() ?? "Bilinmiyor",
+                                    PnpDeviceId: disk["PNPDeviceID"]?.ToString() ?? string.Empty);
                             }
                         }
                     }
@@ -305,6 +311,34 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
         }
     }
 
+    private static IReadOnlyList<SmartStatusRecord> QuerySmartStatusRecords()
+    {
+        try
+        {
+            var result = new List<SmartStatusRecord>();
+            using var searcher = new ManagementObjectSearcher(
+                SmartNamespace,
+                "SELECT InstanceName, PredictFailure, Reason FROM MSStorageDriver_FailurePredictStatus");
+
+            foreach (ManagementObject item in searcher.Get())
+            {
+                using (item)
+                {
+                    result.Add(new SmartStatusRecord(
+                        InstanceName: item["InstanceName"]?.ToString() ?? string.Empty,
+                        PredictFailure: Convert.ToBoolean(item["PredictFailure"] ?? false),
+                        ReasonCode: Convert.ToInt32(item["Reason"] ?? 0)));
+                }
+            }
+
+            return result;
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
     private static PhysicalDiskRecord? MatchPhysicalRecord(Win32DiskRecord win32Record, IReadOnlyList<PhysicalDiskRecord> physicalRecords)
     {
         return physicalRecords.FirstOrDefault(record =>
@@ -317,9 +351,43 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
                    win32Record.Model.Contains("SSD", StringComparison.OrdinalIgnoreCase));
     }
 
+    private static SmartStatusRecord? MatchSmartRecord(
+        Win32DiskRecord win32Record,
+        PhysicalDiskRecord? physicalRecord,
+        IReadOnlyList<SmartStatusRecord> smartRecords)
+    {
+        var candidates = new[]
+        {
+            NormalizeForSearch(win32Record.Model),
+            NormalizeForSearch(win32Record.PnpDeviceId),
+            NormalizeForSearch(physicalRecord?.FriendlyName)
+        }
+        .Where(value => !string.IsNullOrWhiteSpace(value))
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
+
+        foreach (var smartRecord in smartRecords)
+        {
+            var instanceName = NormalizeForSearch(smartRecord.InstanceName);
+            if (candidates.Any(candidate => instanceName.Contains(candidate, StringComparison.Ordinal)))
+            {
+                return smartRecord;
+            }
+        }
+
+        return null;
+    }
+
     private static string BuildWarningSummary(DriveMapping mapping, bool isSystemVolume, long freeBytes, long totalBytes, string mediaClass)
     {
         var messages = new List<string>();
+
+        if (mapping.PredictFailure)
+        {
+            messages.Add(string.IsNullOrWhiteSpace(mapping.SmartReason)
+                ? "Disk arıza öngörüsü sinyali veriyor."
+                : $"Disk arıza öngörüsü sinyali veriyor: {mapping.SmartReason}");
+        }
 
         if (!string.Equals(mapping.Status, "Sağlıklı", StringComparison.OrdinalIgnoreCase) &&
             !string.Equals(mapping.Status, "Bilinmiyor", StringComparison.OrdinalIgnoreCase))
@@ -353,7 +421,8 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
 
     private static string BuildHealthLabel(DriveMapping mapping, string warningSummary)
     {
-        if (string.Equals(mapping.Status, "Risk", StringComparison.OrdinalIgnoreCase) ||
+        if (mapping.PredictFailure ||
+            string.Equals(mapping.Status, "Risk", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(mapping.Status, "Kritik", StringComparison.OrdinalIgnoreCase))
         {
             return "Risk var";
@@ -570,12 +639,37 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
         return value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("'", "\\'", StringComparison.Ordinal);
     }
 
+    private static string NormalizeForSearch(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return new string(value
+            .Where(char.IsLetterOrDigit)
+            .Select(char.ToUpperInvariant)
+            .ToArray());
+    }
+
+    private static string ResolveSmartReason(int reasonCode)
+    {
+        return reasonCode switch
+        {
+            0 => "Windows uyarı nedeni bildirmedi",
+            1 => "Eşik aşımı bildirildi",
+            2 => "Sürücü kendi tanılama uyarısı verdi",
+            _ => $"Neden kodu {reasonCode}"
+        };
+    }
+
     private sealed record Win32DiskRecord(
         int Index,
         string Model,
         string InterfaceType,
         string MediaType,
-        string Status);
+        string Status,
+        string PnpDeviceId);
 
     private sealed record StorageDiskRecord(
         int Number,
@@ -593,6 +687,14 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
         string OperationalStatusLabel,
         long SizeBytes);
 
+    private sealed record SmartStatusRecord(
+        string InstanceName,
+        bool PredictFailure,
+        int ReasonCode)
+    {
+        public string ReasonLabel => ResolveSmartReason(ReasonCode);
+    }
+
     private sealed record DriveMapping(
         string DriveLetter,
         string VolumeLabel,
@@ -608,5 +710,7 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
         string OperationalStatus,
         bool IsRemovable,
         int Index,
-        bool IsBootOrSystem);
+        bool IsBootOrSystem,
+        bool PredictFailure,
+        string? SmartReason);
 }

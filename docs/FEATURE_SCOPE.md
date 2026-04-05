@@ -18,9 +18,7 @@
 - sürücüden ham `.img` alma
 - sürücüden ham `.ctimg` alma
 - sistem dışı sürücülerden akıllı `.ctimg` alma
-- `.img` dosyasını sürücüye geri yükleme
-- ham `.ctimg` dosyasını sürücüye geri yükleme
-- akıllı `.ctimg` dosyasını sistem dışı sürücüye geri yükleme
+- desteklenen `.img` ve `.ctimg` akışlarını geri yükleme
 - `.img -> ham .ctimg` dönüştürme
 - `ham .ctimg -> .img` dönüştürme
 - doğrulama, yürütme, ilerleme ve sonuç raporu
@@ -28,12 +26,14 @@
 ### Diskler ve Sağlık
 
 - bağlı sürücü listesi
-- kapasite görünümü
-- kullanım oranı
-- model, bağlantı ve medya tipi görünümü
-- sistem sürücüsü işareti
-- düşük boş alan uyarısı
-- Windows durum bilgisine göre temel sağlık özeti
+- marka / model görünümü
+- SSD / HDD / NVMe / USB sınıfı görünümü
+- bağlantı tipi görünümü
+- kapasite ve kullanım oranı
+- Windows depolama sağlığına göre temel sağlık özeti
+- bulunabilirse temel arıza öngörüsü sinyali
+- sıralı ve 4K rastgele yerel benchmark
+- hızlı, standart ve derin benchmark profilleri
 
 ### USB Ortamı Oluştur
 
@@ -44,46 +44,31 @@
 - SHA-256 doğrulaması
 - USB aygıt algılama
 - güvenli aygıt engelleme kuralları
-- USB yazma
-- yazma sonrası doğrulama
+- ham disk imajlarını doğrudan yazma
+- hibrit önyüklenebilir ISO dosyalarını doğrudan yazma
+- yazma sonrası geri okuma doğrulaması
 
 ## Kısmi Ama Dürüstçe Sunulanlar
 
-- `Taşıma ve geçiş` bölümü:
-  karar desteği ve yönlendirme sunar, bağımsız yürütme motoru henüz açık değildir
-- masaüstünde çalışan sistem sürücüsü için ham klon ve ham imaj:
-  bilinçli olarak engellenir, CigerTool OS önerilir
-- akıllı kopya:
-  NTFS odaklıdır ve dosya temelli eşleme yapar
 - akıllı imaj:
   şu an sistem dışı sürücülerle ve `.ctimg` biçimiyle sınırlıdır
+- masaüstünde çalışan sistem sürücüsü için ham klon ve ham imaj:
+  bilinçli olarak engellenir, CigerTool OS önerilir
+- standart ISO yazma:
+  dosya çıkarma, bölüm hazırlama ve önyükleme katmanı henüz tam değildir
+- gelişmiş disk sağlığı:
+  üreticiye özel SMART alanları ve CrystalDiskInfo düzeyi tam telemetri henüz yoktur
+- gelişmiş benchmark:
+  CrystalDiskMark ile bire bir tüm profil ve rapor yapısı henüz yoktur
 
 ## Planlanan Ürün Hedefleri
 
-- tüm diskin akıllı imajını daha zengin yerel CigerTool biçimiyle alabilmek
-- ISO yazma
-- Rufus benzeri daha geniş USB hazırlama akışları
-- USB üzerinden doğrudan çalışan servis sistemi profilleri
-- daha güçlü disk sağlık telemetrisi
-- yerel performans ölçümü ve kıyaslama özellikleri
-
-Not:
-
-- tam disk akıllı imaj alma, disk yedekleme alanıdır
-- ISO yazma ise önyüklenebilir medya hazırlama alanıdır
-
-Bu ikisi aynı özellik değildir ve ayrı yürütme katmanlarıyla ele alınacaktır.
-
-## Henüz Açılmayanlar
-
-- tam fiziksel disk bölüm tablosu yeniden kurma
-- önyükleme onarımı
-- BitLocker iş akışları
-- gelişmiş SMART ve üretici telemetrisi
-- bağımsız `Taşıma ve geçiş` yürütme motoru
-- tam kapsamlı ISO yazma
-- canlı işletim sistemi USB profillerinin tamamı
-- CrystalDiskInfo ve CrystalDiskMark düzeyinde tam yerel kapsama ulaşan sağlık/benchmark katmanı
+- tam disk akıllı imajını daha zengin yerel CigerTool biçimiyle alabilmek
+- standart ISO için Rufus benzeri hazırlama akışı
+- çoklu önyükleme profilleri
+- canlı işletim sistemi USB profilleri
+- daha güçlü SMART ve üretici telemetrisi
+- daha geniş benchmark profilleri ve rapor yapısı
 
 ## Dürüstlük Kuralı
 

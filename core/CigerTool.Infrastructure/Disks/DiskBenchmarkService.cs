@@ -77,6 +77,8 @@ public sealed class DiskBenchmarkService(
                 notes.Add("Bu test sistem sürücüsü üzerinde çalıştı; arka plandaki işletim sistemi etkinliği sonuçları etkileyebilir.");
             }
 
+            notes.Add(BuildPerformanceComment(disk, sequentialRead, sequentialWrite, randomReadIops, randomWriteIops));
+
             operationLogService.Record(
                 OperationSeverity.Info,
                 "Diskler",
@@ -360,6 +362,36 @@ public sealed class DiskBenchmarkService(
     private static string FormatSpeed(double value)
     {
         return value <= 0 ? "-" : $"{value:0.0} MB/sn";
+    }
+
+    private static string BuildPerformanceComment(
+        DiskSummary disk,
+        double sequentialRead,
+        double sequentialWrite,
+        long randomReadIops,
+        long randomWriteIops)
+    {
+        var averageSequential = (sequentialRead + sequentialWrite) / 2d;
+        var averageRandomIops = (randomReadIops + randomWriteIops) / 2d;
+
+        if (disk.MediaType.Contains("NVMe", StringComparison.OrdinalIgnoreCase) || averageSequential >= 1800d)
+        {
+            return "Sonuçlar üst seviye NVMe sınıfına yakın görünüyor. Yine de gerçek iş yüklerinde sıcaklık ve kontrolcü davranışı sonuçları değiştirebilir.";
+        }
+
+        if (disk.MediaType.Contains("SSD", StringComparison.OrdinalIgnoreCase) || averageSequential >= 350d)
+        {
+            return averageRandomIops >= 20_000
+                ? "Sonuçlar tipik SSD düzeyinde ve günlük kullanım için güçlü görünüyor."
+                : "Sıralı hızlar SSD düzeyinde, ancak küçük blok erişimlerinde arka plan yükü veya kontrolcü etkisi görülebilir.";
+        }
+
+        if (disk.MediaType.Contains("HDD", StringComparison.OrdinalIgnoreCase) || averageSequential < 250d)
+        {
+            return "Sonuçlar mekanik disk veya USB kutusu sınıfına yakın görünüyor. Özellikle küçük blok erişimlerinde bu davranış normal kabul edilir.";
+        }
+
+        return "Sonuçlar karışık depolama sınıfı gösteriyor; bağlantı türü, USB köprüsü veya denetleyici etkisi altında olabilir.";
     }
 
     private static DiskBenchmarkResult BuildFailureResult(DiskSummary disk, DiskBenchmarkProfileOption profile, string message)

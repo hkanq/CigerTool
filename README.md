@@ -1,14 +1,5 @@
 # CigerTool
 
-## Son Güncelleme
-
-Bu turda ürünün son kullanıcı deneyimini doğrudan etkileyen iki kritik alan güncellendi:
-
-- pencere kabuğu yeniden standart Windows davranışına alındı; başlık, sürükleme ve pencere düğmeleri işletim sistemi tarafından kararlı şekilde yönetiliyor
-- `USB Ortamı Oluştur` ekranı sadeleştirildi; kaynak sorgulama açılışta otomatik çalışıyor, hedef USB uygunluğu otomatik denetleniyor ve tek akışta `otomatik indir ve yaz` işlemi açığa çıkarıldı
-- indirme, yazma ve son doğrulama sırasında canlı ilerleme bilgisi ile iptal akışı eklendi
-- üretim derlemesi `0 uyarı / 0 hata` durumuna getirildi
-
 CigerTool, Windows için geliştirilen yerel bir disk işlemleri ürün ailesidir.
 
 Ürün ailesi iki teslimattan oluşur:
@@ -28,6 +19,7 @@ Bu depo:
 Bu depo şunlardan sorumludur:
 
 - CigerTool uygulaması
+- disk klonlama, imaj alma, geri yükleme ve dönüştürme akışları
 - USB ortamı oluşturma akışı
 - yayın kaynağı ve manifest sistemi
 - WinPE içine yerleştirme ve başlatma sözleşmesi
@@ -49,53 +41,55 @@ Bu depo şunlardan sorumludur:
 - sürücüden ham `.img` imaj alma
 - sürücüden ham `.ctimg` imaj alma
 - sistem dışı sürücülerden akıllı `.ctimg` imaj alma
-- `.img`, ham `.ctimg` ve akıllı `.ctimg` için desteklenen geri yükleme akışları
+- desteklenen `.img` ve `.ctimg` akışlarını geri yükleme
 - `.img` ile ham `.ctimg` arasında dönüştürme
-- USB için imaj indirme, doğrulama ve yazma
+- USB için yayın bilgisi sorgulama, indirme, SHA-256 doğrulama, yazma ve yazma sonrası geri okuma doğrulaması
+- disk listesinde marka/model, bağlantı tipi, SSD/HDD/NVMe sınıfı, sağlık özeti ve temel arıza öngörüsü sinyali
+- sıralı ve 4K rastgele yerel performans testi
 
-## Ürün Hedefi
+## USB Yazma Kapsamı
 
-CigerTool yalnızca klonlama aracı olarak kalmayacaktır. Hedef ürün yönü şunları içerir:
+Bugün gerçekten doğrudan yazılabilen kaynaklar:
 
-- tüm diskin akıllı imajını yerel CigerTool biçiminde alabilmek
-- ISO yazma ve daha geniş USB hazırlama akışları
-- Rufus benzeri daha kapsamlı önyüklenebilir ortam hazırlama desteği
-- doğrudan USB üzerinden çalışan servis işletim sistemi akışları
-- daha zengin disk sağlık telemetrisi
-- yerel disk performans ölçümü ve kıyaslama araçları
+- ham disk imajları (`.img`, `.bin`, `.raw`)
+- hibrit önyüklenebilir ISO kalıpları
+- CigerTool OS için doğrudan disk imajı olarak sunulan yayınlar
+
+Bugün henüz tam kapsama ulaşmayan USB senaryoları:
+
+- standart ISO dosyaları için Rufus benzeri bölüm hazırlama ve dosya çıkarma akışı
+- çoklu önyükleme profilleri
+- canlı işletim sistemi USB profillerinin tamamı
+- Rufus ile bire bir tam eşdeğer tüm medya senaryoları
 
 Önemli ayrım:
 
-- tam disk akıllı imaj alma, disk yedeği özelliğidir ve yerel disk imajı biçimiyle ele alınır
-- ISO yazma ise kurulum veya önyükleme medyası hazırlama özelliğidir
+- tam disk akıllı imaj alma, disk yedekleme alanıdır
+- ISO yazma ise önyüklenebilir medya hazırlama alanıdır
 
-Bu iki alan ürün içinde birlikte bulunacaktır, ancak aynı şey değildir.
+Bu iki alan ürün içinde birlikte bulunur, ancak aynı şey değildir.
 
-## Bilinçli Kapsam Sınırı
-
-Bu sürümde henüz tam kapsamlı olmayan alanlar:
+## Bilinen Kısmi Alanlar
 
 - tam fiziksel disk bölüm tablosu yeniden kurma
 - önyükleme onarımı
 - BitLocker iş akışları
-- gelişmiş SMART ve üretici telemetrisi
-- bağımsız `Taşıma ve geçiş` yürütme motoru
-- tam kapsamlı ISO yazma ve gelişmiş önyüklenebilir USB profilleri
-- CrystalDiskInfo ve CrystalDiskMark düzeyinde tam yerel eşdeğer kapsam
+- üreticiye özel gelişmiş SMART telemetrisi
+- CrystalDiskInfo ve CrystalDiskMark ile yüzde yüz eşdeğer yerel kapsama ulaşan sağlık ve benchmark katmanı
+- tam kapsamlı Rufus eşdeğeri USB hazırlama profilleri
 
-## Yayın Çıktıları
+## Doğrulanan Final Build Çıktıları
 
-- standart masaüstü yapı: [CigerTool.exe](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/artifacts/app/CigerTool.exe)
-- WinPE odaklı yapı: [CigerTool.WinPE.exe](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/artifacts/winpe/CigerTool.WinPE.exe)
+Bu tur sonunda gerçekten doğrulanan yeni build yolları:
 
-Her iki çıktı da açılış için zorunlu yan dosya gerektirmez. Varsayılan ayarlar uygulamanın içinde taşınır.
+- standart masaüstü yapı: [CigerTool.exe](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/artifacts/final/app/CigerTool.exe)
+- WinPE odaklı yapı: [CigerTool.WinPE.exe](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/artifacts/final/winpe/CigerTool.WinPE.exe)
 
-Her iki yayın da yönetici yetkisi ister.
+Not:
 
-Yazılabilir uygulama verileri işletim sistemi konumlarına gider:
-
-- masaüstü yapı: `%LocalAppData%\CigerTool`
-- WinPE odaklı yapı: `%TEMP%\CigerTool`
+- eski [artifacts/winpe](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/artifacts/winpe) altındaki yayın dosyası açık olduğu için bu turdaki doğrulanmış yeni çıktılar `artifacts/final` altında üretildi
+- her iki çıktı da yönetici yetkisi ister
+- yazılabilir uygulama verileri uygulama klasörüne değil işletim sistemi konumlarına gider
 
 ## Doğrulama
 
@@ -103,12 +97,10 @@ Bu turda doğrulananlar:
 
 - `dotnet build CigerTool.sln -c Release`
 - `dotnet test CigerTool.sln -c Release --no-build`
-- `powershell -ExecutionPolicy Bypass -File build/scripts/Publish-CigerTool.ps1`
-- iki yayın çıktısı için kısa açılış denemesi
+- iki ayrı publish profili ile yeni final çıktı üretimi
 
 ## Ana Dokümanlar
 
-- [docs/EXECUTION_ENGINE_STATUS.md](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/docs/EXECUTION_ENGINE_STATUS.md)
 - [docs/CLONE_MODEL.md](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/docs/CLONE_MODEL.md)
 - [docs/IMAGE_WORKFLOW.md](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/docs/IMAGE_WORKFLOW.md)
 - [docs/DISK_HEALTH_MODEL.md](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/docs/DISK_HEALTH_MODEL.md)

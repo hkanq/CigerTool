@@ -16,8 +16,9 @@
         TextOptions.TextFormattingMode="Display"
         TextOptions.TextRenderingMode="ClearType"
         SourceInitialized="Window_OnSourceInitialized"
-        Loaded="Window_OnLoaded">
-  <Grid Margin="14">
+        Loaded="Window_OnLoaded"
+        StateChanged="Window_OnStateChanged">
+  <Grid x:Name="WindowRootLayout" Margin="14">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="308" />
       <ColumnDefinition Width="*" />

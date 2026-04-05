@@ -9,6 +9,8 @@ public partial class MainWindow : Window
 {
     private const uint MonitorDefaultToNearest = 2;
     private const double WindowPadding = 12;
+    private static readonly Thickness NormalWindowMargin = new(14);
+    private static readonly Thickness MaximizedWindowMargin = new(0);
 
     public MainWindow()
     {
@@ -17,12 +19,24 @@ public partial class MainWindow : Window
 
     private void Window_OnSourceInitialized(object? sender, EventArgs e)
     {
+        UpdateWindowFrameSpacing();
         ClampToWorkingArea();
     }
 
     private void Window_OnLoaded(object sender, RoutedEventArgs e)
     {
+        UpdateWindowFrameSpacing();
         ClampToWorkingArea();
+    }
+
+    private void Window_OnStateChanged(object? sender, EventArgs e)
+    {
+        UpdateWindowFrameSpacing();
+
+        if (WindowState == WindowState.Normal)
+        {
+            ClampToWorkingArea();
+        }
     }
 
     private void ClampToWorkingArea()
@@ -72,21 +86,23 @@ public partial class MainWindow : Window
 
     private void ClampWithPrimaryWorkArea(Rect workArea)
     {
-        var availableWidth = Math.Max(MinWidth, workArea.Width - (WindowPadding * 2));
-        var availableHeight = Math.Max(MinHeight, workArea.Height - (WindowPadding * 2));
-
-        if (Width > availableWidth)
+        if (WindowState != WindowState.Normal)
         {
-            Width = availableWidth;
+            return;
         }
 
-        if (Height > availableHeight)
+        var safeWidth = Math.Max(MinWidth, workArea.Width - (WindowPadding * 2));
+        var safeHeight = Math.Max(MinHeight, workArea.Height - (WindowPadding * 2));
+
+        if (Width > safeWidth)
         {
-            Height = availableHeight;
+            Width = safeWidth;
         }
 
-        MaxWidth = availableWidth;
-        MaxHeight = availableHeight;
+        if (Height > safeHeight)
+        {
+            Height = safeHeight;
+        }
 
         var preferredLeft = workArea.Left + Math.Max(WindowPadding, (workArea.Width - Width) / 2);
         var preferredTop = workArea.Top + Math.Max(WindowPadding, (workArea.Height - Height) / 2);
@@ -103,6 +119,18 @@ public partial class MainWindow : Window
         {
             Top = Math.Max(workArea.Top + WindowPadding, workArea.Bottom - Height - WindowPadding);
         }
+    }
+
+    private void UpdateWindowFrameSpacing()
+    {
+        if (WindowRootLayout is null)
+        {
+            return;
+        }
+
+        WindowRootLayout.Margin = WindowState == WindowState.Maximized
+            ? MaximizedWindowMargin
+            : NormalWindowMargin;
     }
 
     [DllImport("user32.dll")]

@@ -104,19 +104,22 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
         !IsOperationRunning &&
         Snapshot.IsAdministrator &&
         SelectedDevice?.CanWrite == true &&
-        (HasPreparedImage || HasRemoteImageSource);
+        ((HasPreparedImage && Snapshot.Release.CanDirectWrite) || HasRemoteImageSource);
 
     public bool CanWritePreparedImage =>
         !IsOperationRunning &&
         Snapshot.IsAdministrator &&
         SelectedDevice?.CanWrite == true &&
-        HasPreparedImage;
+        HasPreparedImage &&
+        Snapshot.Release.CanDirectWrite;
 
     public bool CanCancelCurrentOperation => IsOperationRunning;
 
     public string SourceStatusLabel =>
         HasPreparedImage
-            ? "İmaj hazır"
+            ? Snapshot.Release.CanDirectWrite
+                ? "İmaj hazır"
+                : "Ek hazırlık gerekir"
             : HasRemoteImageSource
                 ? "İndirilmeyi bekliyor"
                 : "Elle dosya seçin";
@@ -127,7 +130,7 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
         {
             if (HasPreparedImage)
             {
-                return $"Hazır dosya: {Snapshot.Release.PreparedImagePath}";
+                return Snapshot.Release.CompatibilityDetails;
             }
 
             return Snapshot.Release.Status;
@@ -241,7 +244,7 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
         var dialog = new OpenFileDialog
         {
             Title = "CigerTool OS imajını seçin",
-            Filter = "Desteklenen imajlar|*.img;*.iso;*.bin;*.wim|Tüm dosyalar|*.*",
+            Filter = "Desteklenen imajlar|*.img;*.iso;*.bin;*.raw;*.wim|Tüm dosyalar|*.*",
             CheckFileExists = true,
             Multiselect = false
         };
@@ -287,6 +290,12 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
         if (!HasPreparedImage)
         {
             StatusMessage = "Önce hazır bir imaj seçin veya indirin.";
+            return;
+        }
+
+        if (!Snapshot.Release.CanDirectWrite)
+        {
+            StatusMessage = Snapshot.Release.CompatibilityDetails;
             return;
         }
 
@@ -351,6 +360,11 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
                     {
                         return download;
                     }
+                }
+
+                if (!Snapshot.Release.CanDirectWrite)
+                {
+                    return new UsbCreatorOperationResult(false, OperationSeverity.Warning, Snapshot.Release.CompatibilityDetails);
                 }
 
                 SetManualProgress("Bütünlük doğrulanıyor", "Hazırlanan imaj dosyası kontrol ediliyor.", isIndeterminate: true);

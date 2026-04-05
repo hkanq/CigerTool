@@ -62,6 +62,10 @@
                 <TextBlock Foreground="{StaticResource TagTextBrush}" Text="{Binding ConnectionType}" />
               </Border>
             </WrapPanel>
+
+            <TextBlock Margin="0,6,0,0"
+                       Foreground="{StaticResource ContentMutedTextBrush}"
+                       Text="{Binding WarningSummary}" />
           </StackPanel>
         </Grid>
       </DataTemplate>
