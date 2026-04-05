@@ -73,6 +73,7 @@ public static class AppBootstrapper
             () => new BackupImagePageViewModel(backupWorkflowService, operationLogService),
             () => new DisksPageViewModel(diskInventoryService, diskBenchmarkService),
             () => new UsbCreatorPageViewModel(usbCreationService),
+            () => new ToolsPageViewModel(toolCatalogService, new ToolLaunchService(operationLogService, appPathService)),
             () => new LogsPageViewModel(operationLogService),
             () => new SettingsPageViewModel(settingsService));
     }

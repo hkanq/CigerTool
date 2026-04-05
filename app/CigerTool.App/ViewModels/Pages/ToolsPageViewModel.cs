@@ -19,7 +19,7 @@ public sealed class ToolsPageViewModel : ViewModelBase
         _toolCatalogService = toolCatalogService;
         _toolLaunchService = toolLaunchService;
         _snapshot = toolCatalogService.GetSnapshot();
-        _launchStatus = "Arac baslatma denemeleri burada raporlanacak.";
+        _launchStatus = "İsteğe bağlı yardımcı açılışları burada raporlanır.";
         RefreshCommand = new RelayCommand(_ => Refresh());
 
         LaunchToolCommand = new RelayCommand(parameter =>
@@ -55,11 +55,11 @@ public sealed class ToolsPageViewModel : ViewModelBase
         try
         {
             Snapshot = _toolCatalogService.GetSnapshot();
-            LaunchStatus = "Tool catalog yenilendi.";
+            LaunchStatus = "Ek özellikler listesi yenilendi.";
         }
         catch (Exception ex)
         {
-            LaunchStatus = $"Tool catalog okunamadi: {ex.Message}";
+            LaunchStatus = $"Ek özellikler listesi okunamadı: {ex.Message}";
         }
     }
 }

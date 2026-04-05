@@ -32,9 +32,10 @@ public sealed class DisksPageViewModel : ViewModelBase
 
         BenchmarkProfiles =
         [
-            new DiskBenchmarkProfileOption("quick", "Hızlı test", "256 MB test dosyasıyla kısa sıralı ve 4K rastgele ölçüm yapar.", 256L * 1024 * 1024, 12_000),
-            new DiskBenchmarkProfileOption("standard", "Standart test", "1 GB test dosyasıyla günlük kullanım için daha kararlı sonuç verir.", 1024L * 1024 * 1024, 24_000),
-            new DiskBenchmarkProfileOption("deep", "Derin test", "4 GB test dosyasıyla daha uzun okuma-yazma ve 4K rastgele ölçüm yapar.", 4L * 1024 * 1024 * 1024, 48_000)
+            new DiskBenchmarkProfileOption("quick", "Hızlı benchmark", "256 MB test dosyasıyla kısa sıralı ve 4K rastgele ölçüm yapar.", 256L * 1024 * 1024, 12_000),
+            new DiskBenchmarkProfileOption("standard", "Standart benchmark", "1 GB test dosyasıyla günlük kullanım için daha kararlı sıralı ve 4K sonuç verir.", 1024L * 1024 * 1024, 24_000),
+            new DiskBenchmarkProfileOption("deep", "Derin benchmark", "4 GB test dosyasıyla daha uzun okuma-yazma ve 4K rastgele ölçüm yapar.", 4L * 1024 * 1024 * 1024, 48_000),
+            new DiskBenchmarkProfileOption("stress", "Sürdürülebilir hız testi", "8 GB test dosyasıyla özellikle SSD önbelleği ve uzun yazma davranışını daha görünür hale getirir.", 8L * 1024 * 1024 * 1024, 96_000)
         ];
 
         _selectedBenchmarkProfile = BenchmarkProfiles[0];

@@ -17,22 +17,7 @@ internal sealed class UsbDeviceDiscoveryService(IOperationLogService operationLo
         var legacyRecords = TryQueryLegacyDiskRecords(systemDrive);
         var devices = new List<UsbPhysicalDeviceInfo>();
 
-        try
-        {
-            devices.AddRange(QueryStorageDevices(systemDrive, legacyRecords));
-        }
-        catch (Exception ex)
-        {
-            operationLogService.Record(
-                OperationSeverity.Warning,
-                "USB Oluşturma",
-                "Gelişmiş USB aygıt taraması tamamlanamadı, yedek taramaya geçiliyor.",
-                "usb.devices.storage.failure",
-                new Dictionary<string, string>
-                {
-                    ["error"] = ex.Message
-                });
-        }
+        devices.AddRange(QueryStorageDevices(systemDrive, legacyRecords));
 
         foreach (var legacyRecord in legacyRecords.Values)
         {
@@ -80,75 +65,104 @@ internal sealed class UsbDeviceDiscoveryService(IOperationLogService operationLo
         }
     }
 
-    private static IReadOnlyList<UsbPhysicalDeviceInfo> QueryStorageDevices(
+    private IReadOnlyList<UsbPhysicalDeviceInfo> QueryStorageDevices(
         string systemDrive,
         IReadOnlyDictionary<int, LegacyDiskRecord> legacyRecords)
     {
         var devices = new List<UsbPhysicalDeviceInfo>();
 
-        using var searcher = new ManagementObjectSearcher(
-            StorageNamespace,
-            "SELECT Number, FriendlyName, Model, Path, Size, BusType, IsBoot, IsSystem FROM MSFT_Disk");
-
-        foreach (ManagementObject disk in searcher.Get())
+        try
         {
-            using (disk)
+            using var searcher = new ManagementObjectSearcher(
+                StorageNamespace,
+                "SELECT Number, FriendlyName, Model, Path, Size, BusType, IsBoot, IsSystem FROM MSFT_Disk");
+
+            foreach (ManagementObject disk in searcher.Get())
             {
-                var diskNumber = TryGetInt(disk["Number"]);
-                if (diskNumber < 0)
+                using (disk)
                 {
-                    continue;
+                    try
+                    {
+                        var diskNumber = TryGetInt(disk["Number"]);
+                        if (diskNumber < 0)
+                        {
+                            continue;
+                        }
+
+                        legacyRecords.TryGetValue(diskNumber, out var legacyRecord);
+
+                        var friendlyName = FirstNonEmpty(
+                            disk["FriendlyName"]?.ToString(),
+                            disk["Model"]?.ToString(),
+                            legacyRecord?.Model,
+                            $"USB Disk {diskNumber}");
+
+                        var path = disk["Path"]?.ToString()?.Trim();
+                        var busType = TryGetInt(disk["BusType"]);
+
+                        if (!IsStorageUsbCandidate(busType, friendlyName, path, legacyRecord))
+                        {
+                            continue;
+                        }
+
+                        var sizeBytes = TryGetLong(disk["Size"]);
+                        if (sizeBytes <= 0 && legacyRecord is not null)
+                        {
+                            sizeBytes = legacyRecord.SizeBytes;
+                        }
+
+                        var mountedVolumes = GetMountedVolumesByDiskNumber(diskNumber);
+                        if (mountedVolumes.Count == 0 && legacyRecord is not null)
+                        {
+                            mountedVolumes = legacyRecord.MountedVolumes;
+                        }
+
+                        var physicalPath = $@"\\.\PhysicalDrive{diskNumber}";
+                        var isSystemDisk = TryGetBool(disk["IsSystem"]) ||
+                                           TryGetBool(disk["IsBoot"]) ||
+                                           mountedVolumes.Any(volume => string.Equals(volume, systemDrive, StringComparison.OrdinalIgnoreCase)) ||
+                                           legacyRecord?.IsSystemDisk == true;
+
+                        devices.Add(new UsbPhysicalDeviceInfo(
+                            Id: physicalPath,
+                            PhysicalPath: physicalPath,
+                            Model: friendlyName,
+                            SizeBytes: sizeBytes,
+                            MountedVolumes: mountedVolumes,
+                            IsSystemDisk: isSystemDisk));
+                    }
+                    catch (Exception ex)
+                    {
+                        operationLogService.Record(
+                            OperationSeverity.Warning,
+                            "USB Oluşturma",
+                            "Bir USB aygıt girdisi atlandı.",
+                            "usb.devices.storage.item.failure",
+                            new Dictionary<string, string>
+                            {
+                                ["error"] = ex.Message
+                            });
+                    }
                 }
-
-                legacyRecords.TryGetValue(diskNumber, out var legacyRecord);
-
-                var friendlyName = FirstNonEmpty(
-                    disk["FriendlyName"]?.ToString(),
-                    disk["Model"]?.ToString(),
-                    legacyRecord?.Model,
-                    $"USB Disk {diskNumber}");
-
-                var path = disk["Path"]?.ToString()?.Trim();
-                var busType = TryGetInt(disk["BusType"]);
-
-                if (!IsStorageUsbCandidate(busType, friendlyName, path, legacyRecord))
-                {
-                    continue;
-                }
-
-                var sizeBytes = TryGetLong(disk["Size"]);
-                if (sizeBytes <= 0 && legacyRecord is not null)
-                {
-                    sizeBytes = legacyRecord.SizeBytes;
-                }
-
-                var physicalPath = $@"\\.\PhysicalDrive{diskNumber}";
-                var mountedVolumes = GetMountedVolumesFromStorageDisk(diskNumber);
-
-                if (mountedVolumes.Count == 0 && legacyRecord is not null)
-                {
-                    mountedVolumes = legacyRecord.MountedVolumes;
-                }
-
-                var isSystemDisk = TryGetBool(disk["IsSystem"]) ||
-                                   TryGetBool(disk["IsBoot"]) ||
-                                   mountedVolumes.Any(volume => string.Equals(volume, systemDrive, StringComparison.OrdinalIgnoreCase)) ||
-                                   legacyRecord?.IsSystemDisk == true;
-
-                devices.Add(new UsbPhysicalDeviceInfo(
-                    Id: physicalPath,
-                    PhysicalPath: physicalPath,
-                    Model: friendlyName,
-                    SizeBytes: sizeBytes,
-                    MountedVolumes: mountedVolumes,
-                    IsSystemDisk: isSystemDisk));
             }
+        }
+        catch (Exception ex)
+        {
+            operationLogService.Record(
+                OperationSeverity.Warning,
+                "USB Oluşturma",
+                "Gelişmiş USB aygıt taraması tamamlanamadı, yedek taramaya geçiliyor.",
+                "usb.devices.storage.failure",
+                new Dictionary<string, string>
+                {
+                    ["error"] = ex.Message
+                });
         }
 
         return devices;
     }
 
-    private static Dictionary<int, LegacyDiskRecord> QueryLegacyDiskRecords(string systemDrive)
+    private Dictionary<int, LegacyDiskRecord> QueryLegacyDiskRecords(string systemDrive)
     {
         var records = new Dictionary<int, LegacyDiskRecord>();
         using var searcher = new ManagementObjectSearcher(
@@ -158,112 +172,95 @@ internal sealed class UsbDeviceDiscoveryService(IOperationLogService operationLo
         {
             using (disk)
             {
-                var index = TryGetInt(disk["Index"]);
-                if (index < 0)
+                try
                 {
-                    continue;
-                }
+                    var index = TryGetInt(disk["Index"]);
+                    if (index < 0)
+                    {
+                        continue;
+                    }
 
-                var deviceId = disk["DeviceID"]?.ToString();
-                if (string.IsNullOrWhiteSpace(deviceId))
+                    var deviceId = disk["DeviceID"]?.ToString();
+                    if (string.IsNullOrWhiteSpace(deviceId))
+                    {
+                        continue;
+                    }
+
+                    var model = FirstNonEmpty(
+                        disk["Model"]?.ToString(),
+                        disk["Caption"]?.ToString(),
+                        $"USB Disk {index}");
+
+                    var mediaType = disk["MediaType"]?.ToString() ?? string.Empty;
+                    var interfaceType = disk["InterfaceType"]?.ToString() ?? string.Empty;
+                    var pnpDeviceId = disk["PNPDeviceID"]?.ToString() ?? string.Empty;
+                    var sizeBytes = TryGetLong(disk["Size"]);
+                    var physicalPath = $@"\\.\PhysicalDrive{index}";
+                    var mountedVolumes = GetMountedVolumesByDiskNumber(index);
+                    var isSystemDisk = mountedVolumes.Any(volume => string.Equals(volume, systemDrive, StringComparison.OrdinalIgnoreCase));
+
+                    records[index] = new LegacyDiskRecord(
+                        PhysicalPath: physicalPath,
+                        Model: model,
+                        SizeBytes: sizeBytes,
+                        MountedVolumes: mountedVolumes,
+                        IsSystemDisk: isSystemDisk,
+                        IsUsbCandidate: IsLegacyUsbCandidate(interfaceType, mediaType, pnpDeviceId, model));
+                }
+                catch (Exception ex)
                 {
-                    continue;
+                    operationLogService.Record(
+                        OperationSeverity.Warning,
+                        "USB Oluşturma",
+                        "Eski yöntemle bir USB aygıt girdisi okunamadı.",
+                        "usb.devices.legacy.item.failure",
+                        new Dictionary<string, string>
+                        {
+                            ["error"] = ex.Message
+                        });
                 }
-
-                var model = FirstNonEmpty(
-                    disk["Model"]?.ToString(),
-                    disk["Caption"]?.ToString(),
-                    $"USB Disk {index}");
-
-                var mediaType = disk["MediaType"]?.ToString() ?? string.Empty;
-                var interfaceType = disk["InterfaceType"]?.ToString() ?? string.Empty;
-                var pnpDeviceId = disk["PNPDeviceID"]?.ToString() ?? string.Empty;
-                var sizeBytes = TryGetLong(disk["Size"]);
-                var physicalPath = $@"\\.\PhysicalDrive{index}";
-                var mountedVolumes = GetMountedVolumesFromLegacyDisk(deviceId);
-                var isSystemDisk = mountedVolumes.Any(volume => string.Equals(volume, systemDrive, StringComparison.OrdinalIgnoreCase));
-
-                records[index] = new LegacyDiskRecord(
-                    PhysicalPath: physicalPath,
-                    Model: model,
-                    SizeBytes: sizeBytes,
-                    MountedVolumes: mountedVolumes,
-                    IsSystemDisk: isSystemDisk,
-                    IsUsbCandidate: IsLegacyUsbCandidate(interfaceType, mediaType, pnpDeviceId, model));
             }
         }
 
         return records;
     }
 
-    private static IReadOnlyList<string> GetMountedVolumesFromStorageDisk(int diskNumber)
+    private static IReadOnlyList<string> GetMountedVolumesByDiskNumber(int diskNumber)
     {
         var volumes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        using var partitionSearcher = new ManagementObjectSearcher(
-            StorageNamespace,
-            $"SELECT DriveLetter, AccessPaths FROM MSFT_Partition WHERE DiskNumber = {diskNumber}");
 
-        foreach (ManagementObject partition in partitionSearcher.Get())
+        try
         {
-            using (partition)
-            {
-                var driveLetter = partition["DriveLetter"]?.ToString();
-                if (!string.IsNullOrWhiteSpace(driveLetter))
-                {
-                    volumes.Add(driveLetter.TrimEnd(':') + ":");
-                }
+            using var partitionSearcher = new ManagementObjectSearcher(
+                StorageNamespace,
+                $"SELECT DriveLetter, AccessPaths FROM MSFT_Partition WHERE DiskNumber = {diskNumber}");
 
-                if (partition["AccessPaths"] is string[] accessPaths)
+            foreach (ManagementObject partition in partitionSearcher.Get())
+            {
+                using (partition)
                 {
-                    foreach (var accessPath in accessPaths)
+                    var driveLetter = partition["DriveLetter"]?.ToString();
+                    if (!string.IsNullOrWhiteSpace(driveLetter))
                     {
-                        var normalized = NormalizeVolumeLabel(accessPath);
-                        if (!string.IsNullOrWhiteSpace(normalized))
+                        volumes.Add(driveLetter.TrimEnd(':') + ":");
+                    }
+
+                    if (partition["AccessPaths"] is string[] accessPaths)
+                    {
+                        foreach (var accessPath in accessPaths)
                         {
-                            volumes.Add(normalized);
+                            var normalized = NormalizeVolumeLabel(accessPath);
+                            if (!string.IsNullOrWhiteSpace(normalized))
+                            {
+                                volumes.Add(normalized);
+                            }
                         }
                     }
                 }
             }
         }
-
-        return volumes.OrderBy(volume => volume).ToArray();
-    }
-
-    private static IReadOnlyList<string> GetMountedVolumesFromLegacyDisk(string deviceId)
-    {
-        var volumes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var escapedDeviceId = EscapeWmiString(deviceId);
-
-        using var partitionSearcher = new ManagementObjectSearcher(
-            $"ASSOCIATORS OF {{Win32_DiskDrive.DeviceID='{escapedDeviceId}'}} WHERE AssocClass = Win32_DiskDriveToDiskPartition");
-
-        foreach (ManagementObject partition in partitionSearcher.Get())
+        catch
         {
-            using (partition)
-            {
-                var partitionId = partition["DeviceID"]?.ToString();
-                if (string.IsNullOrWhiteSpace(partitionId))
-                {
-                    continue;
-                }
-
-                var escapedPartitionId = EscapeWmiString(partitionId);
-                using var logicalDiskSearcher = new ManagementObjectSearcher(
-                    $"ASSOCIATORS OF {{Win32_DiskPartition.DeviceID='{escapedPartitionId}'}} WHERE AssocClass = Win32_LogicalDiskToPartition");
-
-                foreach (ManagementObject logicalDisk in logicalDiskSearcher.Get())
-                {
-                    using (logicalDisk)
-                    {
-                        var normalized = NormalizeVolumeLabel(logicalDisk["Name"]?.ToString());
-                        if (!string.IsNullOrWhiteSpace(normalized))
-                        {
-                            volumes.Add(normalized);
-                        }
-                    }
-                }
-            }
         }
 
         return volumes.OrderBy(volume => volume).ToArray();
@@ -383,13 +380,6 @@ internal sealed class UsbDeviceDiscoveryService(IOperationLogService operationLo
         {
             return false;
         }
-    }
-
-    private static string EscapeWmiString(string value)
-    {
-        return value
-            .Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("'", "\\'", StringComparison.Ordinal);
     }
 
     private sealed record LegacyDiskRecord(

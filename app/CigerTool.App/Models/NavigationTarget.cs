@@ -7,6 +7,7 @@ public enum NavigationTarget
     BackupImage = 3,
     Disks = 4,
     UsbCreator = 5,
-    Logs = 6,
-    Settings = 7
+    Extras = 6,
+    Logs = 7,
+    Settings = 8
 }

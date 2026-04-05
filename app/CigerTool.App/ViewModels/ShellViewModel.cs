@@ -25,6 +25,7 @@ public sealed class ShellViewModel : ViewModelBase
         Func<BackupImagePageViewModel> backupImageFactory,
         Func<DisksPageViewModel> disksFactory,
         Func<UsbCreatorPageViewModel> usbCreatorFactory,
+        Func<ToolsPageViewModel> toolsFactory,
         Func<LogsPageViewModel> logsFactory,
         Func<SettingsPageViewModel> settingsFactory)
     {
@@ -49,6 +50,7 @@ public sealed class ShellViewModel : ViewModelBase
             [NavigationTarget.BackupImage] = backupImageFactory,
             [NavigationTarget.Disks] = disksFactory,
             [NavigationTarget.UsbCreator] = usbCreatorFactory,
+            [NavigationTarget.Extras] = toolsFactory,
             [NavigationTarget.Logs] = logsFactory,
             [NavigationTarget.Settings] = settingsFactory
         };
@@ -59,7 +61,8 @@ public sealed class ShellViewModel : ViewModelBase
             new(NavigationTarget.Cloning, "Klonlama", "Bir diski başka bir diske taşıyın", "\uE7C5"),
             new(NavigationTarget.BackupImage, "Yedekleme ve İmaj", "İmaj alın, geri yükleyin ve dönüştürün", "\uE823"),
             new(NavigationTarget.Disks, "Diskler ve Sağlık", "Bağlı diskleri ve sağlık durumlarını görün", "\uEDA2"),
-            new(NavigationTarget.UsbCreator, "USB Ortamı Oluştur", "CigerTool OS belleğini hazırlayın", "\uE88E"),
+            new(NavigationTarget.UsbCreator, "USB Ortamı Oluştur", "Kurulum ve canlı ortam USB'lerini hazırlayın", "\uE88E"),
+            new(NavigationTarget.Extras, "Ek Özellikler", "Gelişmiş tanılama, benchmark ve yardımcılar", "\uE9CE"),
             new(NavigationTarget.Logs, "Günlükler", "İşlem kayıtlarını inceleyin", "\uE9D2"),
             new(NavigationTarget.Settings, "Ayarlar", "Uygulama tercihleri ve destek bilgileri", "\uE713")
         };

@@ -19,7 +19,7 @@
             <TextBlock Margin="0,10,0,0"
                        TextWrapping="Wrap"
                        Foreground="{StaticResource ContentTextBrush}"
-                       Text="CigerTool OS kaynağını otomatik sorgulayın, uygun USB hedefini seçin ve indirme ile yazma işlemini tek akışta tamamlayın." />
+                       Text="Kaynak otomatik olarak sorgulanır, uygun USB hedefleri listelenir ve indirme ile yazma işlemi tek akışta tamamlanır." />
             <TextBlock Margin="0,12,0,0"
                        Foreground="{StaticResource ContentMutedTextBrush}"
                        Text="{Binding StatusMessage}" />
@@ -224,11 +224,13 @@
 
           <TextBlock Margin="0,16,0,0"
                      Foreground="{StaticResource ContentMutedTextBrush}"
-                     Text="Hedef aygıt" />
-          <ComboBox Margin="0,8,0,0"
-                    ItemsSource="{Binding Snapshot.Devices}"
-                    SelectedItem="{Binding SelectedDevice}"
-                    ItemTemplate="{StaticResource UsbDeviceComboItemTemplate}" />
+                     Text="{Binding Snapshot.Devices.Count, StringFormat=Bulunan USB aygıtı: {0}}" />
+
+          <ListBox Margin="0,12,0,0"
+                   MaxHeight="260"
+                   ItemsSource="{Binding Snapshot.Devices}"
+                   SelectedItem="{Binding SelectedDevice}"
+                   ItemTemplate="{StaticResource UsbDeviceComboItemTemplate}" />
 
           <Border Margin="0,16,0,0"
                   Padding="16"

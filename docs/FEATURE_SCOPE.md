@@ -33,7 +33,7 @@
 - Windows depolama sağlığına göre temel sağlık özeti
 - bulunabilirse temel arıza öngörüsü sinyali
 - sıralı ve 4K rastgele yerel benchmark
-- hızlı, standart ve derin benchmark profilleri
+- hızlı, standart, derin ve sürdürülebilir hız testi profilleri
 
 ### USB Ortamı Oluştur
 
@@ -46,7 +46,15 @@
 - güvenli aygıt engelleme kuralları
 - ham disk imajlarını doğrudan yazma
 - hibrit önyüklenebilir ISO dosyalarını doğrudan yazma
-- yazma sonrası geri okuma doğrulaması
+- standart ISO kaynaklarını otomatik hazırlama
+- Windows kurulum ISO'sunda büyük `install.wim` dosyasını bölme
+- yazma sonrası temel doğrulama
+
+### Ek Özellikler
+
+- gelişmiş tanılama kartları
+- isteğe bağlı yardımcı araç listesi
+- çekirdek ve isteğe bağlı yetenek ayrımının kullanıcıya açık sunumu
 
 ## Kısmi Ama Dürüstçe Sunulanlar
 
@@ -54,8 +62,8 @@
   şu an sistem dışı sürücülerle ve `.ctimg` biçimiyle sınırlıdır
 - masaüstünde çalışan sistem sürücüsü için ham klon ve ham imaj:
   bilinçli olarak engellenir, CigerTool OS önerilir
-- standart ISO yazma:
-  dosya çıkarma, bölüm hazırlama ve önyükleme katmanı henüz tam değildir
+- standart ISO hazırlama:
+  genel akış açılmıştır, ancak Rufus ile bire bir tüm özel medya ve çoklu önyükleme senaryoları henüz tamamlanmamıştır
 - gelişmiş disk sağlığı:
   üreticiye özel SMART alanları ve CrystalDiskInfo düzeyi tam telemetri henüz yoktur
 - gelişmiş benchmark:
@@ -64,7 +72,6 @@
 ## Planlanan Ürün Hedefleri
 
 - tam disk akıllı imajını daha zengin yerel CigerTool biçimiyle alabilmek
-- standart ISO için Rufus benzeri hazırlama akışı
 - çoklu önyükleme profilleri
 - canlı işletim sistemi USB profilleri
 - daha güçlü SMART ve üretici telemetrisi

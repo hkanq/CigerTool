@@ -24,6 +24,7 @@ public sealed class UsbCreationService : IUsbCreationService
     private readonly IAppPathService _appPathService;
     private readonly UsbDeviceDiscoveryService _deviceDiscoveryService;
     private readonly RawDiskWriter _rawDiskWriter;
+    private readonly StandardIsoUsbWriter _standardIsoUsbWriter;
     private readonly object _sync = new();
 
     private ReleaseManifestSummary _releaseSummary;
@@ -47,6 +48,7 @@ public sealed class UsbCreationService : IUsbCreationService
         _appPathService = appPathService;
         _deviceDiscoveryService = new UsbDeviceDiscoveryService(operationLogService);
         _rawDiskWriter = new RawDiskWriter();
+        _standardIsoUsbWriter = new StandardIsoUsbWriter(operationLogService);
 
         var settings = settingsService.GetSettings();
         _releaseSummary = BuildInitialSummary(settings);
@@ -605,6 +607,24 @@ public sealed class UsbCreationService : IUsbCreationService
                     ["verification"] = verification.Message
                 });
 
+            if (ShouldUseStandardIsoPreparation(imagePath, mediaProfile))
+            {
+                var isoResult = await _standardIsoUsbWriter.PrepareAndWriteAsync(
+                    imagePath,
+                    device,
+                    mediaProfile.BootProfileLabel,
+                    progress,
+                    cancellationToken);
+
+                if (!isoResult.Succeeded)
+                {
+                    return isoResult;
+                }
+
+                await RefreshUsbDevicesAsync(CancellationToken.None);
+                return isoResult;
+            }
+
             await _rawDiskWriter.WriteImageAsync(imagePath, device, progress, cancellationToken);
 
             var calculatedSha = GetCalculatedSha256();
@@ -683,17 +703,17 @@ public sealed class UsbCreationService : IUsbCreationService
         if (device.IsSystemDisk)
         {
             canWrite = false;
-            safetyStatus = "Engelli: sistem diski";
+            safetyStatus = "Engelli: sistem diski veya önyükleme diski";
         }
         else if (device.SizeBytes <= 0)
         {
             canWrite = false;
-            safetyStatus = "Engelli: kapasite okunamadı";
+            safetyStatus = "Engelli: kapasite bilgisi okunamadı";
         }
         else if (imageSizeBytes > 0 && device.SizeBytes < imageSizeBytes)
         {
             canWrite = false;
-            safetyStatus = "Engelli: aygıt imaj için küçük";
+            safetyStatus = $"Engelli: aygıt küçük. Gerekli en az alan {FormatBytes(imageSizeBytes)}";
         }
         else
         {
@@ -783,6 +803,13 @@ public sealed class UsbCreationService : IUsbCreationService
         return releaseSummary.SizeBytes ?? 0L;
     }
 
+    private static bool ShouldUseStandardIsoPreparation(string imagePath, PreparedMediaProfile mediaProfile)
+    {
+        return string.Equals(Path.GetExtension(imagePath), ".iso", StringComparison.OrdinalIgnoreCase) &&
+               mediaProfile.CanDirectWrite &&
+               !LooksLikeHybridIso(imagePath);
+    }
+
     private static PreparedMediaProfile AnalyzePreparedMedia(ReleaseManifestSummary releaseSummary, string? preparedImagePath)
     {
         var referencePath = !string.IsNullOrWhiteSpace(preparedImagePath)
@@ -833,35 +860,122 @@ public sealed class UsbCreationService : IUsbCreationService
 
     private static PreparedMediaProfile AnalyzeIsoProfile(string? preparedImagePath, string sourceDescription)
     {
+        var scenario = ClassifyIsoScenario(sourceDescription);
+
         if (!string.IsNullOrWhiteSpace(preparedImagePath) && File.Exists(preparedImagePath))
         {
             if (LooksLikeHybridIso(preparedImagePath))
             {
                 return new PreparedMediaProfile(
                     SourceFormatLabel: "ISO",
-                    BootProfileLabel: IsCigerToolImage(sourceDescription) ? "CigerTool OS hibrit ISO" : "Hibrit önyüklenebilir ISO",
+                    BootProfileLabel: scenario.HybridProfileLabel,
                     WriteModeLabel: "Doğrudan sektör kopyası",
                     CompatibilityLabel: "Bu ISO doğrudan USB'ye yazılabilir.",
-                    CompatibilityDetails: "ISO dosyasında disk imajı imzası bulundu. Uygulama bu kalıbı disk düzeyinde yazar, ardından geri okuma ile bütünlüğü denetler.",
+                    CompatibilityDetails: $"{scenario.HybridDetailPrefix} ISO dosyasında hibrit önyükleme imzası bulundu. Uygulama bu kalıbı disk düzeyinde yazar, ardından geri okuma ile bütünlüğü denetler.",
                     CanDirectWrite: true);
             }
 
             return new PreparedMediaProfile(
                 SourceFormatLabel: "ISO",
-                BootProfileLabel: "Standart ISO",
-                WriteModeLabel: "Dosya çıkarma gerekir",
-                CompatibilityLabel: "Bu ISO için gelişmiş hazırlık gerekir.",
-                CompatibilityDetails: "Seçilen ISO doğrudan sektör kopyasıyla yazılabilecek hibrit bir kalıp değil. Rufus benzeri bölüm hazırlama, dosya kopyalama ve önyükleme profili katmanı henüz tüm senaryolar için tamamlanmadı.",
-                CanDirectWrite: false);
+                BootProfileLabel: scenario.StandardProfileLabel,
+                WriteModeLabel: "Otomatik hazırlama ve dosya kopyalama",
+                CompatibilityLabel: "Bu ISO otomatik hazırlanıp USB'ye yazılabilir.",
+                CompatibilityDetails: $"{scenario.StandardDetailPrefix} Seçilen ISO hibrit değil. CigerTool USB'yi hazırlayıp dosyaları otomatik olarak kopyalar; gerektiğinde Windows kurulum kaynaklarında büyük install.wim dosyasını USB uyumluluğu için böler.",
+                CanDirectWrite: true);
         }
 
         return new PreparedMediaProfile(
             SourceFormatLabel: "ISO",
-            BootProfileLabel: "ISO (indirildikten sonra doğrulanacak)",
+            BootProfileLabel: scenario.PendingProfileLabel,
             WriteModeLabel: "Profil analizi bekleniyor",
             CompatibilityLabel: "Bu ISO'nun doğrudan yazma uyumluluğu indirildikten sonra kontrol edilecek.",
-            CompatibilityDetails: "ISO dosyası yerelde incelendiğinde hibrit önyükleme imzası aranır. Hibrit ISO ise doğrudan yazılır; standart ISO ise ek hazırlık gerektiği açıkça belirtilir.",
+            CompatibilityDetails: $"{scenario.PendingDetailPrefix} ISO dosyası yerelde incelendiğinde hibrit önyükleme imzası aranır. Hibrit ISO ise doğrudan yazılır; standart ISO ise CigerTool otomatik hazırlama akışına geçer.",
             CanDirectWrite: false);
+    }
+
+    private static IsoScenarioProfile ClassifyIsoScenario(string sourceDescription)
+    {
+        var normalized = sourceDescription ?? string.Empty;
+
+        if (IsCigerToolImage(normalized))
+        {
+            return new IsoScenarioProfile(
+                HybridProfileLabel: "CigerTool OS hibrit ISO",
+                StandardProfileLabel: "CigerTool OS standart ISO",
+                PendingProfileLabel: "CigerTool OS ISO",
+                StandardCompatibilityLabel: "Bu CigerTool OS ISO kalıbı için gelişmiş hazırlık gerekir.",
+                HybridDetailPrefix: "CigerTool OS kaynağı tanındı.",
+                StandardDetailPrefix: "CigerTool OS kaynağı tanındı.",
+                PendingDetailPrefix: "CigerTool OS kaynağı indirildikten sonra ayrıntılı profil denetimi yapılacak.");
+        }
+
+        if (normalized.Contains("windows", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("win11", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("win10", StringComparison.OrdinalIgnoreCase))
+        {
+            return new IsoScenarioProfile(
+                HybridProfileLabel: "Windows kurulum hibrit ISO",
+                StandardProfileLabel: "Windows kurulum ISO'su",
+                PendingProfileLabel: "Windows kurulum ISO'su",
+                StandardCompatibilityLabel: "Windows kurulum ISO'su için gelişmiş hazırlık gerekir.",
+                HybridDetailPrefix: "Windows kurulum kaynağı tanındı.",
+                StandardDetailPrefix: "Windows kurulum kaynağı tanındı.",
+                PendingDetailPrefix: "Windows kurulum kaynağı indirildikten sonra yazma profili netleştirilecek.");
+        }
+
+        if (normalized.Contains("linux", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("ubuntu", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("debian", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("fedora", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("arch", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("mint", StringComparison.OrdinalIgnoreCase))
+        {
+            return new IsoScenarioProfile(
+                HybridProfileLabel: "Linux canlı / kurulum hibrit ISO",
+                StandardProfileLabel: "Linux ISO'su",
+                PendingProfileLabel: "Linux ISO'su",
+                StandardCompatibilityLabel: "Bu Linux ISO'su için gelişmiş hazırlık gerekebilir.",
+                HybridDetailPrefix: "Linux kaynağı tanındı.",
+                StandardDetailPrefix: "Linux kaynağı tanındı.",
+                PendingDetailPrefix: "Linux kaynağı indirildikten sonra hibrit önyükleme denetimi yapılacak.");
+        }
+
+        if (normalized.Contains("winpe", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("bartpe", StringComparison.OrdinalIgnoreCase))
+        {
+            return new IsoScenarioProfile(
+                HybridProfileLabel: "WinPE hibrit ISO",
+                StandardProfileLabel: "WinPE ISO'su",
+                PendingProfileLabel: "WinPE ISO'su",
+                StandardCompatibilityLabel: "Bu WinPE ISO'su için gelişmiş hazırlık gerekir.",
+                HybridDetailPrefix: "WinPE kaynağı tanındı.",
+                StandardDetailPrefix: "WinPE kaynağı tanındı.",
+                PendingDetailPrefix: "WinPE kaynağı indirildikten sonra yazma profili netleştirilecek.");
+        }
+
+        if (normalized.Contains("memtest", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("rescue", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("diagnostic", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("tool", StringComparison.OrdinalIgnoreCase))
+        {
+            return new IsoScenarioProfile(
+                HybridProfileLabel: "Araç / test hibrit ISO",
+                StandardProfileLabel: "Araç / test ISO'su",
+                PendingProfileLabel: "Araç / test ISO'su",
+                StandardCompatibilityLabel: "Bu araç ISO'su için gelişmiş hazırlık gerekebilir.",
+                HybridDetailPrefix: "Araç veya test ISO'su tanındı.",
+                StandardDetailPrefix: "Araç veya test ISO'su tanındı.",
+                PendingDetailPrefix: "Araç veya test ISO'su indirildikten sonra yazma profili netleştirilecek.");
+        }
+
+        return new IsoScenarioProfile(
+            HybridProfileLabel: "Hibrit önyüklenebilir ISO",
+            StandardProfileLabel: "Standart ISO",
+            PendingProfileLabel: "ISO",
+            StandardCompatibilityLabel: "Bu ISO için gelişmiş hazırlık gerekir.",
+            HybridDetailPrefix: string.Empty,
+            StandardDetailPrefix: string.Empty,
+            PendingDetailPrefix: string.Empty);
     }
 
     private static bool LooksLikeHybridIso(string imagePath)
@@ -1123,4 +1237,13 @@ public sealed class UsbCreationService : IUsbCreationService
         string CompatibilityLabel,
         string CompatibilityDetails,
         bool CanDirectWrite);
+
+    private sealed record IsoScenarioProfile(
+        string HybridProfileLabel,
+        string StandardProfileLabel,
+        string PendingProfileLabel,
+        string StandardCompatibilityLabel,
+        string HybridDetailPrefix,
+        string StandardDetailPrefix,
+        string PendingDetailPrefix);
 }

@@ -57,63 +57,93 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
 
-      <ItemsControl ItemsSource="{Binding Snapshot.Tools}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate>
-            <Border Style="{StaticResource CardBorderStyle}">
-              <Grid>
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <StackPanel>
-                  <TextBlock FontSize="18"
-                             FontWeight="SemiBold"
-                             Foreground="{StaticResource ContentHeadingBrush}"
-                             Text="{Binding Name}" />
-                  <TextBlock Margin="0,6,0,0"
-                             Foreground="{StaticResource ContentMutedTextBrush}"
-                             Text="{Binding Category}" />
-                  <TextBlock Margin="0,6,0,0"
-                             Foreground="{StaticResource ContentMutedTextBrush}"
-                             Text="{Binding AvailabilityStatus}" />
-                  <TextBlock Margin="0,10,0,0"
-                             TextWrapping="Wrap"
-                             Foreground="{StaticResource ContentTextBrush}"
-                             Text="{Binding Description}" />
-                  <TextBlock Margin="0,10,0,0"
-                             TextWrapping="Wrap"
-                             Foreground="{StaticResource ContentMutedTextBrush}"
-                             Text="{Binding ResolvedExecutablePath}" />
-                </StackPanel>
-
-                <Button Grid.Column="1"
-                        Width="150"
-                        Height="42"
-                        Margin="18,0,0,0"
-                        VerticalAlignment="Center"
-                        IsEnabled="{Binding CanLaunch}"
-                        Command="{Binding DataContext.LaunchToolCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                        CommandParameter="{Binding}"
-                        Content="Başlatmayı dene"
-                        Style="{StaticResource PrimaryActionButtonStyle}" />
-              </Grid>
-            </Border>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-
       <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource RaisedSurfaceBrush}">
         <StackPanel>
-          <TextBlock FontSize="16"
+          <TextBlock FontSize="18"
                      FontWeight="SemiBold"
                      Foreground="{StaticResource ContentHeadingBrush}"
-                     Text="Çalıştırma politikası" />
+                     Text="Yerleşik gelişmiş yetenekler" />
+          <WrapPanel Margin="0,14,0,0">
+            <Border Width="260" Style="{StaticResource CardBorderStyle}" Margin="0,0,14,14">
+              <StackPanel>
+                <TextBlock FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource ContentHeadingBrush}" Text="USB medya profili" />
+                <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Foreground="{StaticResource ContentTextBrush}" Text="Windows, Linux, WinPE, araç ve CigerTool OS kaynaklarını ayırt eder; hibrit ve standart ISO akışlarını ayrı yönetir." />
+              </StackPanel>
+            </Border>
+            <Border Width="260" Style="{StaticResource CardBorderStyle}" Margin="0,0,14,14">
+              <StackPanel>
+                <TextBlock FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource ContentHeadingBrush}" Text="Sürdürülebilir hız testi" />
+                <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Foreground="{StaticResource ContentTextBrush}" Text="Uzun yazma davranışı ve önbellek etkisini görmek için daha ağır benchmark profilleri sunar." />
+              </StackPanel>
+            </Border>
+            <Border Width="260" Style="{StaticResource CardBorderStyle}" Margin="0,0,14,14">
+              <StackPanel>
+                <TextBlock FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource ContentHeadingBrush}" Text="Gelişmiş günlük desteği" />
+                <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Foreground="{StaticResource ContentTextBrush}" Text="İşlem günlükleri, hata kayıtları ve hazırlama akışı ayrıntıları CigerTool içinde tutulur ve gerektiğinde destek için kullanılabilir." />
+              </StackPanel>
+            </Border>
+          </WrapPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource CardBorderStyle}">
+        <StackPanel>
+          <TextBlock FontSize="18"
+                     FontWeight="SemiBold"
+                     Foreground="{StaticResource ContentHeadingBrush}"
+                     Text="İsteğe bağlı yardımcılar" />
           <TextBlock Margin="0,10,0,0"
                      TextWrapping="Wrap"
                      Foreground="{StaticResource ContentTextBrush}"
                      Text="{Binding Snapshot.LaunchPolicyNote}" />
+
+          <ItemsControl Margin="0,14,0,0" ItemsSource="{Binding Snapshot.Tools}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource CardBorderStyle}">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                      <TextBlock FontSize="18"
+                                 FontWeight="SemiBold"
+                                 Foreground="{StaticResource ContentHeadingBrush}"
+                                 Text="{Binding Name}" />
+                      <TextBlock Margin="0,6,0,0"
+                                 Foreground="{StaticResource ContentMutedTextBrush}"
+                                 Text="{Binding Category}" />
+                      <TextBlock Margin="0,6,0,0"
+                                 Foreground="{StaticResource ContentMutedTextBrush}"
+                                 Text="{Binding AvailabilityStatus}" />
+                      <TextBlock Margin="0,10,0,0"
+                                 TextWrapping="Wrap"
+                                 Foreground="{StaticResource ContentTextBrush}"
+                                 Text="{Binding Description}" />
+                      <TextBlock Margin="0,10,0,0"
+                                 TextWrapping="Wrap"
+                                 Foreground="{StaticResource ContentMutedTextBrush}"
+                                 Text="{Binding ResolvedExecutablePath}" />
+                    </StackPanel>
+
+                    <Button Grid.Column="1"
+                            Width="120"
+                            Height="42"
+                            Margin="18,0,0,0"
+                            VerticalAlignment="Center"
+                            IsEnabled="{Binding CanLaunch}"
+                            Command="{Binding DataContext.LaunchToolCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding}"
+                            Content="Aç"
+                            Style="{StaticResource SecondaryActionButtonStyle}" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
           <TextBlock Margin="0,14,0,0"
                      Foreground="{StaticResource ContentMutedTextBrush}"
                      Text="{Binding LaunchStatus}" />

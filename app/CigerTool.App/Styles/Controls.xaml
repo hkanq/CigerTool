@@ -250,7 +250,7 @@
     <Setter Property="Focusable" Value="False" />
     <Setter Property="Background" Value="{StaticResource InputSurfaceBrush}" />
     <Setter Property="BorderBrush" Value="{StaticResource InputBorderBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="BorderThickness" Value="2" />
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="ToggleButton">
@@ -258,23 +258,29 @@
                   Background="{TemplateBinding Background}"
                   BorderBrush="{TemplateBinding BorderBrush}"
                   BorderThickness="{TemplateBinding BorderThickness}"
-                  CornerRadius="18">
+                  CornerRadius="20">
             <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="40" />
+                <ColumnDefinition Width="54" />
               </Grid.ColumnDefinitions>
               <ContentPresenter Margin="16,8,12,8"
                                 VerticalAlignment="Center"
                                 Content="{TemplateBinding Content}"
                                 ContentTemplate="{TemplateBinding ContentTemplate}" />
-              <TextBlock Grid.Column="1"
-                         VerticalAlignment="Center"
-                         HorizontalAlignment="Center"
-                         FontFamily="Segoe MDL2 Assets"
-                         FontSize="13"
-                         Foreground="{StaticResource ContentMutedTextBrush}"
-                         Text="&#xE70D;" />
+              <Border Grid.Column="1"
+                      Margin="0"
+                      Background="{StaticResource AccentSoftBrush}"
+                      BorderBrush="{StaticResource InputBorderBrush}"
+                      BorderThickness="1,0,0,0"
+                      CornerRadius="0,18,18,0">
+                <TextBlock VerticalAlignment="Center"
+                           HorizontalAlignment="Center"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="13"
+                           Foreground="{StaticResource AccentBrush}"
+                           Text="&#xE70D;" />
+              </Border>
             </Grid>
           </Border>
           <ControlTemplate.Triggers>
@@ -297,8 +303,9 @@
     <Setter Property="Foreground" Value="{StaticResource ContentHeadingBrush}" />
     <Setter Property="Background" Value="{StaticResource InputSurfaceBrush}" />
     <Setter Property="BorderBrush" Value="{StaticResource InputBorderBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="BorderThickness" Value="2" />
     <Setter Property="Padding" Value="0" />
+    <Setter Property="MinHeight" Value="60" />
     <Setter Property="SnapsToDevicePixels" Value="True" />
     <Setter Property="Template">
       <Setter.Value>
@@ -326,9 +333,9 @@
                       MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
                       MaxHeight="{TemplateBinding MaxDropDownHeight}"
                       Background="{StaticResource PopupSurfaceBrush}"
-                      BorderBrush="{StaticResource InputBorderBrush}"
+                      BorderBrush="{StaticResource AccentBrush}"
                       BorderThickness="1"
-                      CornerRadius="18">
+                      CornerRadius="20">
                 <ScrollViewer Margin="6"
                               SnapsToDevicePixels="True">
                   <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
@@ -373,6 +380,57 @@
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
               <Setter Property="Opacity" Value="0.5" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType="ListBox">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ListBox">
+          <Border Background="Transparent">
+            <ScrollViewer Focusable="False"
+                          Padding="{TemplateBinding Padding}">
+              <ItemsPresenter />
+            </ScrollViewer>
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType="ListBoxItem">
+    <Setter Property="Padding" Value="16,14" />
+    <Setter Property="Margin" Value="0,0,0,10" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ListBoxItem">
+          <Border x:Name="Root"
+                  Padding="{TemplateBinding Padding}"
+                  Background="{StaticResource InputSurfaceBrush}"
+                  BorderBrush="{StaticResource InputBorderBrush}"
+                  BorderThickness="2"
+                  CornerRadius="18">
+            <ContentPresenter />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource InputBorderHoverBrush}" />
+              <Setter TargetName="Root" Property="Background" Value="{StaticResource SelectionHoverBrush}" />
+            </Trigger>
+            <Trigger Property="IsSelected" Value="True">
+              <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+              <Setter TargetName="Root" Property="Background" Value="{StaticResource SelectionCurrentBrush}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter Property="Opacity" Value="0.55" />
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>

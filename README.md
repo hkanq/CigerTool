@@ -31,10 +31,11 @@ Bu depo şunlardan sorumludur:
 - `Yedekleme ve İmaj`
 - `Diskler ve Sağlık`
 - `USB Ortamı Oluştur`
+- `Ek Özellikler`
 - `Günlükler`
 - `Ayarlar`
 
-## Bugün Gerçekten Çalışan Çekirdek İşlemler
+## Gerçekten Çalışan Çekirdek İşlemler
 
 - ham kopya ile sürücüden sürücüye gerçek bayt kopyalama
 - akıllı kopya ile dosya temelli sürücü eşleme
@@ -43,61 +44,55 @@ Bu depo şunlardan sorumludur:
 - sistem dışı sürücülerden akıllı `.ctimg` imaj alma
 - desteklenen `.img` ve `.ctimg` akışlarını geri yükleme
 - `.img` ile ham `.ctimg` arasında dönüştürme
-- USB için yayın bilgisi sorgulama, indirme, SHA-256 doğrulama, yazma ve yazma sonrası geri okuma doğrulaması
+- USB için yayın bilgisi sorgulama, indirme, SHA-256 doğrulama, yazma ve yazma sonrası doğrulama
 - disk listesinde marka/model, bağlantı tipi, SSD/HDD/NVMe sınıfı, sağlık özeti ve temel arıza öngörüsü sinyali
-- sıralı ve 4K rastgele yerel performans testi
+- sıralı, 4K rastgele ve sürdürülebilir hız odaklı yerel benchmark
 
 ## USB Yazma Kapsamı
 
-Bugün gerçekten doğrudan yazılabilen kaynaklar:
+Bugün gerçekten uygulanabilen USB akışları:
 
-- ham disk imajları (`.img`, `.bin`, `.raw`)
-- hibrit önyüklenebilir ISO kalıpları
-- CigerTool OS için doğrudan disk imajı olarak sunulan yayınlar
+- ham disk imajlarını (`.img`, `.bin`, `.raw`) doğrudan yazma
+- hibrit önyüklenebilir ISO kalıplarını doğrudan yazma
+- standart ISO kalıpları için USB hazırlama, dosya kopyalama ve temel önyükleme akışı
+- Windows kurulum ISO'ları için büyük `install.wim` dosyasını FAT32 uyumluluğu adına bölme
 
-Bugün henüz tam kapsama ulaşmayan USB senaryoları:
+USB kaynak analizi bugün şu senaryoları ayırt eder:
 
-- standart ISO dosyaları için Rufus benzeri bölüm hazırlama ve dosya çıkarma akışı
-- çoklu önyükleme profilleri
-- canlı işletim sistemi USB profillerinin tamamı
-- Rufus ile bire bir tam eşdeğer tüm medya senaryoları
-
-Önemli ayrım:
-
-- tam disk akıllı imaj alma, disk yedekleme alanıdır
-- ISO yazma ise önyüklenebilir medya hazırlama alanıdır
-
-Bu iki alan ürün içinde birlikte bulunur, ancak aynı şey değildir.
+- Windows kurulum ISO'su
+- Linux canlı / kurulum ISO'su
+- WinPE ISO'su
+- araç / test ISO'su
+- CigerTool OS ISO veya disk imajı
 
 ## Bilinen Kısmi Alanlar
 
-- tam fiziksel disk bölüm tablosu yeniden kurma
-- önyükleme onarımı
-- BitLocker iş akışları
+- Rufus ile bire bir tüm medya ve çoklu önyükleme senaryoları
 - üreticiye özel gelişmiş SMART telemetrisi
-- CrystalDiskInfo ve CrystalDiskMark ile yüzde yüz eşdeğer yerel kapsama ulaşan sağlık ve benchmark katmanı
-- tam kapsamlı Rufus eşdeğeri USB hazırlama profilleri
+- CrystalDiskInfo ve CrystalDiskMark ile yüzde yüz eşdeğer ayrıntı ve rapor yapısı
+- tam fiziksel disk bölüm tablosu yeniden kurma ve otomatik önyükleme onarımı
+- BitLocker odaklı gelişmiş geçiş iş akışları
 
-## Doğrulanan Final Build Çıktıları
+## Doğrulanan Güncel Build Çıktıları
 
-Bu tur sonunda gerçekten doğrulanan yeni build yolları:
+Şu turda gerçekten doğrulanmış yeni build yolları:
 
 - standart masaüstü yapı: [CigerTool.exe](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/artifacts/final/app/CigerTool.exe)
 - WinPE odaklı yapı: [CigerTool.WinPE.exe](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/artifacts/final/winpe/CigerTool.WinPE.exe)
 
 Not:
 
-- eski [artifacts/winpe](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/artifacts/winpe) altındaki yayın dosyası açık olduğu için bu turdaki doğrulanmış yeni çıktılar `artifacts/final` altında üretildi
+- `artifacts/app` ve `artifacts/winpe` altında açık olan eski süreçler varsa yeni doğrulanmış çıktılar `artifacts/final` altında bırakılır
 - her iki çıktı da yönetici yetkisi ister
 - yazılabilir uygulama verileri uygulama klasörüne değil işletim sistemi konumlarına gider
 
 ## Doğrulama
 
-Bu turda doğrulananlar:
+Son başarılı doğrulamalar:
 
 - `dotnet build CigerTool.sln -c Release`
 - `dotnet test CigerTool.sln -c Release --no-build`
-- iki ayrı publish profili ile yeni final çıktı üretimi
+- iki ayrı publish ile yeni final çıktı üretimi
 
 ## Ana Dokümanlar
 

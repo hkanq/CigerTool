@@ -20,17 +20,17 @@ public sealed class JsonToolCatalogService(
         var missingCount = tools.Count(tool => !tool.Exists);
 
         return new ToolsWorkspaceSnapshot(
-            Heading: "Yardımcı araçlar",
-            Summary: "İsteğe bağlı araçlar burada listelenir. Çekirdek disk işlemleri CigerTool içinde yerel olarak çalışır.",
+            Heading: "Ek Özellikler",
+            Summary: "Gelişmiş tanılama bağlantıları, destek araçları ve isteğe bağlı yardımcı bileşenler burada yer alır. Çekirdek disk işlemleri CigerTool içinde yerel olarak çalışır.",
             Metrics:
             [
-                new CardMetric("Toplam araç", tools.Count.ToString(), "Tanımlı tüm yardımcı araçlar."),
-                new CardMetric("Kullanılabilir", launchableCount.ToString(), "Bu sistemde açılabilecek yardımcı araçlar."),
+                new CardMetric("İsteğe bağlı araç", tools.Count.ToString(), "Tanımlı tüm yardımcı araçlar."),
+                new CardMetric("Hazır", launchableCount.ToString(), "Bu sistemde açılabilecek yardımcı bileşenler."),
                 new CardMetric("Eksik", missingCount.ToString(), "Dosyası bulunmayan veya çözümlenemeyen öğeler."),
-                new CardMetric("Kaynak", Path.GetFileName(source), "Etkin araç listesi kaynağı.")
+                new CardMetric("Katalog", Path.GetFileName(source), "Etkin araç listesi kaynağı.")
             ],
             Tools: tools,
-            LaunchPolicyNote: "Yardımcı araçlar isteğe bağlıdır; bulunmamaları CigerTool'un ana işlevlerini etkilemez.",
+            LaunchPolicyNote: "Bu bölümdeki yardımcılar isteğe bağlıdır; bulunmamaları CigerTool'un ana disk işlemlerini etkilemez.",
             CatalogSource: source);
     }
 

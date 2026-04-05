@@ -57,6 +57,15 @@ public sealed class StartupDiagnosticsService(
                 : settings.DefaultManifestUrl,
             OperationSeverity.Info));
 
+        checks.Add(BuildExecutableCheck(
+            "ISO hazırlama bileşenleri",
+            [
+                Path.Combine(global::System.Environment.GetFolderPath(global::System.Environment.SpecialFolder.Windows), "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+                Path.Combine(global::System.Environment.GetFolderPath(global::System.Environment.SpecialFolder.Windows), "System32", "dism.exe"),
+                Path.Combine(global::System.Environment.GetFolderPath(global::System.Environment.SpecialFolder.Windows), "System32", "bootsect.exe")
+            ],
+            "Standart ISO hazırlama akışı için gereken Windows bileşenleri denetlenir."));
+
         var toolSnapshot = toolCatalogService.GetSnapshot();
         checks.Add(new StartupCheckItem(
             "Yardımcı araç desteği",
@@ -115,5 +124,17 @@ public sealed class StartupDiagnosticsService(
             exists ? "Hazır" : "Kullanılamıyor",
             path,
             exists ? OperationSeverity.Info : OperationSeverity.Error);
+    }
+
+    private static StartupCheckItem BuildExecutableCheck(string label, IReadOnlyList<string> paths, string successMessage)
+    {
+        var missing = paths.Where(path => !File.Exists(path)).ToArray();
+        return new StartupCheckItem(
+            label,
+            missing.Length == 0 ? "Hazır" : "Kısmi",
+            missing.Length == 0
+                ? successMessage
+                : $"Eksik bileşenler: {string.Join(", ", missing.Select(Path.GetFileName))}",
+            missing.Length == 0 ? OperationSeverity.Info : OperationSeverity.Warning);
     }
 }
