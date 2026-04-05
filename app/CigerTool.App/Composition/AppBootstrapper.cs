@@ -26,6 +26,7 @@ public static class AppBootstrapper
         IOperationLogService operationLogService = new FileOperationLogService(appPathService);
         IDiskInventoryService diskInventoryService = new RuntimeDiskInventoryService(operationLogService);
         IDiskBenchmarkService diskBenchmarkService = new DiskBenchmarkService(operationLogService);
+        IDiskSurfaceScanService diskSurfaceScanService = new DiskSurfaceScanService(operationLogService);
         IBackupWorkflowService backupWorkflowService = new BackupWorkflowService(
             diskInventoryService,
             environmentProfileService,
@@ -40,6 +41,7 @@ public static class AppBootstrapper
             appPathService);
         IReleaseSourceResolver releaseSourceResolver = new ReleaseSourceResolver(settingsService, operationLogService, appPathService);
         IUsbCreationService usbCreationService = new UsbCreationService(settingsService, releaseSourceResolver, operationLogService, appPathService);
+        IWindowsDeploymentService windowsDeploymentService = new WindowsDeploymentService(operationLogService);
         IStartupDiagnosticsService startupDiagnosticsService = new StartupDiagnosticsService(
             appPathService,
             settingsService,
@@ -71,9 +73,9 @@ public static class AppBootstrapper
             () => new DashboardPageViewModel(dashboardService),
             () => new CloningPageViewModel(cloneWorkflowService, environmentProfileService, operationLogService),
             () => new BackupImagePageViewModel(backupWorkflowService, operationLogService),
-            () => new DisksPageViewModel(diskInventoryService, diskBenchmarkService),
+            () => new DisksPageViewModel(diskInventoryService, diskBenchmarkService, diskSurfaceScanService),
             () => new UsbCreatorPageViewModel(usbCreationService),
-            () => new ToolsPageViewModel(usbCreationService),
+            () => new ToolsPageViewModel(usbCreationService, diskInventoryService, windowsDeploymentService),
             () => new LogsPageViewModel(operationLogService),
             () => new SettingsPageViewModel(settingsService));
     }

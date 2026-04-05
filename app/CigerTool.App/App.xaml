@@ -46,7 +46,7 @@
 
           <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,6,0,0">
             <TextBlock Foreground="{StaticResource ContentMutedTextBrush}"
-                       Text="{Binding DeviceModel, TargetNullValue=Bilinmeyen model}" />
+                       Text="{Binding DeviceModel, TargetNullValue=Model bilgisi okunamadı}" />
             <WrapPanel Margin="0,6,0,0">
               <Border Margin="0,0,8,0"
                       Padding="8,4"
@@ -128,6 +128,19 @@
                      FontWeight="SemiBold"
                      Foreground="{StaticResource ContentHeadingBrush}"
                      Text="{Binding Title}" />
+          <TextBlock Margin="0,4,0,0"
+                     TextWrapping="Wrap"
+                     Foreground="{StaticResource ContentMutedTextBrush}"
+                     Text="{Binding Description}" />
+        </StackPanel>
+      </DataTemplate>
+
+      <DataTemplate x:Key="WindowsEditionComboItemTemplate" DataType="{x:Type appModels:WindowsImageEditionOption}">
+        <StackPanel Margin="0,2">
+          <TextBlock FontSize="14"
+                     FontWeight="SemiBold"
+                     Foreground="{StaticResource ContentHeadingBrush}"
+                     Text="{Binding Name}" />
           <TextBlock Margin="0,4,0,0"
                      TextWrapping="Wrap"
                      Foreground="{StaticResource ContentMutedTextBrush}"

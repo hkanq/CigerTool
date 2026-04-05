@@ -152,20 +152,20 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
         var smartSnapshot = ParseSmartSnapshot(smartData?.VendorSpecific, smartThresholds?.VendorSpecific);
         var modelSource = FirstNonEmpty(storageRecord?.FriendlyName, win32Record.Model, physicalRecord?.FriendlyName, "Bilinmeyen aygıt");
         var brand = ExtractBrand(modelSource, physicalRecord?.Manufacturer, win32Record.Manufacturer);
-        var status = FirstNonEmpty(storageRecord?.HealthLabel, win32Record.Status, physicalRecord?.HealthLabel, "Bilinmiyor");
-        var operationalStatus = FirstNonEmpty(storageRecord?.OperationalStatusLabel, physicalRecord?.OperationalStatusLabel, "Bilinmiyor");
+        var status = FirstNonEmpty(storageRecord?.HealthLabel, win32Record.Status, physicalRecord?.HealthLabel);
+        var operationalStatus = FirstNonEmpty(storageRecord?.OperationalStatusLabel, physicalRecord?.OperationalStatusLabel);
 
         return new DriveMapping(
             DriveLetter: driveLetter,
             VolumeLabel: SafeRead(() => drive.VolumeLabel, string.Empty),
-            FileSystem: SafeRead(() => drive.DriveFormat, "Bilinmiyor"),
+            FileSystem: SafeRead(() => drive.DriveFormat, string.Empty),
             TotalBytes: drive.TotalSize,
             FreeBytes: drive.AvailableFreeSpace,
             Model: modelSource,
             Brand: brand,
             InterfaceType: win32Record.InterfaceType,
             BusTypeLabel: ResolveBusTypeLabel(storageRecord?.BusTypeCode, win32Record.InterfaceType),
-            MediaType: FirstNonEmpty(physicalRecord?.MediaTypeLabel, win32Record.MediaType, "Bilinmiyor"),
+            MediaType: FirstNonEmpty(physicalRecord?.MediaTypeLabel, win32Record.MediaType),
             Status: status,
             OperationalStatus: operationalStatus,
             IsRemovable: drive.DriveType == DriveType.Removable ||
@@ -234,7 +234,8 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
             TemperatureLabel: temperatureLabel,
             HealthHighlights: healthHighlights,
             HealthDetails: healthDetails,
-            SmartAttributes: mapping.SmartSnapshot.Attributes);
+            SmartAttributes: mapping.SmartSnapshot.Attributes,
+            DiskNumber: mapping.Index);
     }
 
     private static IReadOnlyList<string> BuildHealthHighlights(DriveMapping mapping, long totalBytes, long freeBytes)
@@ -264,6 +265,16 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
         if (mapping.SmartSnapshot.PowerCycleCount is long powerCycleCount)
         {
             items.Add($"Güç döngüsü: {powerCycleCount:N0}");
+        }
+
+        if (mapping.SmartSnapshot.TotalWrittenBytes is long totalWrittenBytes)
+        {
+            items.Add($"Toplam yazılan veri: {ByteSizeFormatter.Format(totalWrittenBytes)}");
+        }
+
+        if (mapping.SmartSnapshot.TotalReadBytes is long totalReadBytes)
+        {
+            items.Add($"Toplam okunan veri: {ByteSizeFormatter.Format(totalReadBytes)}");
         }
 
         if (mapping.SmartSnapshot.HasReallocatedSectors)
@@ -296,21 +307,54 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
 
     private static IReadOnlyList<DiskPropertyItem> BuildHealthDetails(DriveMapping mapping, string mediaClass, string connectionType)
     {
-        return
-        [
-            new DiskPropertyItem("Marka", mapping.Brand),
-            new DiskPropertyItem("Model", mapping.Model),
-            new DiskPropertyItem("Seri no", Fallback(mapping.SerialNumber)),
-            new DiskPropertyItem("Firmware", Fallback(mapping.FirmwareVersion)),
-            new DiskPropertyItem("Bağlantı", connectionType),
-            new DiskPropertyItem("Disk türü", mediaClass),
-            new DiskPropertyItem("SMART durumu", mapping.SmartSnapshot.Attributes.Count > 0 ? "Okunabildi" : "Ayrıntılı veri yok"),
-            new DiskPropertyItem("Depolama durumu", mapping.Status),
-            new DiskPropertyItem("Operasyon durumu", mapping.OperationalStatus),
-            new DiskPropertyItem("Mantıksal sektör", mapping.LogicalSectorSize > 0 ? $"{mapping.LogicalSectorSize} B" : "Bilinmiyor"),
-            new DiskPropertyItem("Fiziksel sektör", mapping.PhysicalSectorSize > 0 ? $"{mapping.PhysicalSectorSize} B" : "Bilinmiyor"),
-            new DiskPropertyItem("Dönüş hızı", mapping.SpindleSpeed > 0 ? $"{mapping.SpindleSpeed} RPM" : mediaClass.Contains("SSD", StringComparison.OrdinalIgnoreCase) ? "SSD / NVMe" : "Bilinmiyor")
-        ];
+        var details = new List<DiskPropertyItem>();
+        AddIfPresent(details, "Marka", mapping.Brand);
+        AddIfPresent(details, "Model", mapping.Model);
+        AddIfPresent(details, "Bağlantı", connectionType);
+        AddIfPresent(details, "Disk türü", mediaClass);
+        AddIfPresent(details, "Depolama durumu", mapping.Status);
+        AddIfPresent(details, "Operasyon durumu", mapping.OperationalStatus);
+
+        AddIfPresent(details, "Seri no", mapping.SerialNumber);
+        AddIfPresent(details, "Firmware", mapping.FirmwareVersion);
+
+        if (mapping.LogicalSectorSize > 0)
+        {
+            details.Add(new DiskPropertyItem("Mantıksal sektör", $"{mapping.LogicalSectorSize} B"));
+        }
+
+        if (mapping.PhysicalSectorSize > 0)
+        {
+            details.Add(new DiskPropertyItem("Fiziksel sektör", $"{mapping.PhysicalSectorSize} B"));
+        }
+
+        if (mapping.SpindleSpeed > 0)
+        {
+            details.Add(new DiskPropertyItem("Dönüş hızı", $"{mapping.SpindleSpeed} RPM"));
+        }
+
+        if (mapping.SmartSnapshot.PowerOnHours is long powerOnHours)
+        {
+            details.Add(new DiskPropertyItem("Çalışma süresi", $"{powerOnHours:N0} saat"));
+        }
+
+        if (mapping.SmartSnapshot.PowerCycleCount is long powerCycleCount)
+        {
+            details.Add(new DiskPropertyItem("Güç döngüsü", $"{powerCycleCount:N0}"));
+        }
+
+        if (mapping.SmartSnapshot.TotalWrittenBytes is long totalWrittenBytes)
+        {
+            details.Add(new DiskPropertyItem("Toplam yazılan", ByteSizeFormatter.Format(totalWrittenBytes)));
+        }
+
+        if (mapping.SmartSnapshot.TotalReadBytes is long totalReadBytes)
+        {
+            details.Add(new DiskPropertyItem("Toplam okunan", ByteSizeFormatter.Format(totalReadBytes)));
+        }
+
+        details.Add(new DiskPropertyItem("SMART durumu", mapping.SmartSnapshot.Attributes.Count > 0 ? "Okunabildi" : "Sürücü bu ayrıntıyı vermiyor"));
+        return details;
     }
 
     private static string BuildWarningSummary(DriveMapping mapping, bool isSystemVolume, long freeBytes, long totalBytes, string mediaClass)
@@ -404,14 +448,14 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
             return $"%{healthPercent}";
         }
 
-        return mapping.PredictFailure ? "Kritik" : "Bilinmiyor";
+        return mapping.PredictFailure ? "Risk sinyali var" : "SMART verisi yok";
     }
 
     private static string BuildTemperatureLabel(DriveMapping mapping)
     {
         return mapping.SmartSnapshot.TemperatureCelsius is int temperature
             ? $"{temperature} °C"
-            : "Bilinmiyor";
+            : "Sıcaklık verisi yok";
     }
 
     private static string BuildIdentityLabel(DriveMapping mapping, string mediaClass, string connectionType)
@@ -481,10 +525,10 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
                 {
                     return new Win32DiskRecord(
                         Index: Convert.ToInt32(disk["Index"] ?? -1),
-                        Model: disk["Model"]?.ToString() ?? "Bilinmeyen aygıt",
-                        InterfaceType: disk["InterfaceType"]?.ToString() ?? "Bilinmiyor",
-                        MediaType: disk["MediaType"]?.ToString() ?? "Bilinmiyor",
-                        Status: disk["Status"]?.ToString() ?? "Bilinmiyor",
+                        Model: disk["Model"]?.ToString() ?? string.Empty,
+                        InterfaceType: disk["InterfaceType"]?.ToString() ?? string.Empty,
+                        MediaType: disk["MediaType"]?.ToString() ?? string.Empty,
+                        Status: disk["Status"]?.ToString() ?? string.Empty,
                         PnpDeviceId: disk["PNPDeviceID"]?.ToString() ?? string.Empty,
                         SerialNumber: disk["SerialNumber"]?.ToString()?.Trim() ?? string.Empty,
                         FirmwareRevision: disk["FirmwareRevision"]?.ToString()?.Trim() ?? string.Empty,
@@ -730,6 +774,8 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
         var hasReallocatedSectors = false;
         var hasPendingSectors = false;
         var hasInterfaceErrors = false;
+        var totalWrittenBytes = (long?)null;
+        var totalReadBytes = (long?)null;
 
         for (var offset = 2; offset + 11 < vendorData.Length; offset += 12)
         {
@@ -778,6 +824,12 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
                 case 199:
                     hasInterfaceErrors = rawValue > 0;
                     break;
+                case 241:
+                    totalWrittenBytes ??= rawValue * 512L;
+                    break;
+                case 242:
+                    totalReadBytes ??= rawValue * 512L;
+                    break;
                 case 202:
                 case 231:
                 case 233:
@@ -795,6 +847,8 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
             TemperatureCelsius: temperature,
             PowerOnHours: powerOnHours,
             PowerCycleCount: powerCycleCount,
+            TotalWrittenBytes: totalWrittenBytes,
+            TotalReadBytes: totalReadBytes,
             HasReallocatedSectors: hasReallocatedSectors,
             HasPendingSectors: hasPendingSectors,
             HasInterfaceErrors: hasInterfaceErrors);
@@ -893,7 +947,7 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
 
     private static string ResolveConnectionType(string busTypeLabel, string interfaceType, bool isRemovable)
     {
-        if (!string.IsNullOrWhiteSpace(busTypeLabel) && !string.Equals(busTypeLabel, "Bilinmiyor", StringComparison.OrdinalIgnoreCase))
+        if (IsMeaningfulValue(busTypeLabel))
         {
             return busTypeLabel;
         }
@@ -957,7 +1011,7 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
             8 => "RAID",
             9 => "iSCSI",
             3 => "ATA",
-            _ => string.IsNullOrWhiteSpace(interfaceType) ? "Bilinmiyor" : interfaceType
+            _ => string.IsNullOrWhiteSpace(interfaceType) ? "Standart bağlantı" : interfaceType
         };
     }
 
@@ -970,7 +1024,7 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
             2 => "Dikkat gerekiyor",
             3 => "Risk",
             5 => "Risk",
-            _ => "Bilinmiyor"
+            _ => string.Empty
         };
     }
 
@@ -992,7 +1046,7 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
 
         if (rawValue is null)
         {
-            return "Bilinmiyor";
+            return string.Empty;
         }
 
         var code = Convert.ToInt32(rawValue);
@@ -1004,7 +1058,7 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
             6 => "Stres altında",
             7 => "Tahmini arıza",
             8 => "Başlatılıyor",
-            _ => "Bilinmiyor"
+            _ => string.Empty
         };
     }
 
@@ -1015,7 +1069,7 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
             3 => "HDD",
             4 => "SSD",
             5 => "SCM",
-            _ => "Bilinmiyor"
+            _ => string.Empty
         };
     }
 
@@ -1029,7 +1083,7 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
 
         if (string.IsNullOrWhiteSpace(model))
         {
-            return "Bilinmeyen marka";
+            return string.Empty;
         }
 
         var normalized = model.Trim();
@@ -1045,7 +1099,7 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
             return match;
         }
 
-        return normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "Bilinmeyen marka";
+        return normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
     }
 
     private static string SafeRead(Func<string> action, string fallback)
@@ -1061,14 +1115,34 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
         }
     }
 
+    private static void AddIfPresent(ICollection<DiskPropertyItem> target, string label, string? value)
+    {
+        var trimmed = value?.Trim();
+        if (IsMeaningfulValue(trimmed))
+        {
+            target.Add(new DiskPropertyItem(label, trimmed!));
+        }
+    }
+
     private static string Fallback(string value)
     {
-        return string.IsNullOrWhiteSpace(value) ? "Bilinmiyor" : value;
+        return string.IsNullOrWhiteSpace(value) ? string.Empty : value;
     }
 
     private static string FirstNonEmpty(params string?[] values)
     {
         return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
+    }
+
+    private static bool IsMeaningfulValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return !string.Equals(value.Trim(), "Bilinmiyor", StringComparison.OrdinalIgnoreCase) &&
+               !string.Equals(value.Trim(), "Unknown", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string NormalizeForSearch(string? value)
@@ -1149,11 +1223,13 @@ public sealed class RuntimeDiskInventoryService(IOperationLogService operationLo
         int? TemperatureCelsius,
         long? PowerOnHours,
         long? PowerCycleCount,
+        long? TotalWrittenBytes,
+        long? TotalReadBytes,
         bool HasReallocatedSectors,
         bool HasPendingSectors,
         bool HasInterfaceErrors)
     {
-        public static ParsedSmartSnapshot Empty { get; } = new([], null, null, null, null, false, false, false);
+        public static ParsedSmartSnapshot Empty { get; } = new([], null, null, null, null, null, null, false, false, false);
     }
 
     private sealed record DriveMapping(

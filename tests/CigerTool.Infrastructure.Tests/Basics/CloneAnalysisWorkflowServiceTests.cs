@@ -84,7 +84,8 @@ public sealed class CloneAnalysisWorkflowServiceTests
             TemperatureLabel: "30 °C",
             HealthHighlights: ["Belirgin bir risk sinyali yok."],
             HealthDetails: [new DiskPropertyItem("Marka", "Test")],
-            SmartAttributes: []);
+            SmartAttributes: [],
+            DiskNumber: 0);
     }
 
     private sealed class FakeDiskInventoryService(IReadOnlyList<DiskSummary> disks) : IDiskInventoryService

@@ -43,9 +43,25 @@ public sealed class DiskBenchmarkService(IOperationLogService operationLogServic
             if (CanUseWinSat())
             {
                 var result = await RunWinSatBenchmarkAsync(disk, profile, progress, cancellationToken);
-                if (result is not null)
+                if (result is not null && !IsImplausibleResult(disk, result))
                 {
                     return result;
+                }
+
+                if (result is not null)
+                {
+                    operationLogService.Record(
+                        OperationSeverity.Warning,
+                        "Diskler",
+                        "WinSAT sonucu disk sınıfıyla uyumsuz göründüğü için yedek benchmark yöntemi kullanılacak.",
+                        "disk.benchmark.winsat.implausible",
+                        new Dictionary<string, string>
+                        {
+                            ["disk"] = disk.Name,
+                            ["seqRead"] = result.SequentialReadLabel,
+                            ["seqWrite"] = result.SequentialWriteLabel,
+                            ["mediaType"] = disk.MediaType
+                        });
                 }
             }
 
@@ -389,6 +405,54 @@ public sealed class DiskBenchmarkService(IOperationLogService operationLogServic
             : disk.MediaType.Contains("SSD", StringComparison.OrdinalIgnoreCase) || averageSequential >= 350d
                 ? randomReadIops >= 20_000 ? "Sonuçlar tipik SSD sınıfına yakın görünüyor." : "Sıralı hızlar SSD düzeyinde, küçük blok erişimlerinde dalgalanma görülebilir."
                 : "Sonuçlar HDD veya USB kutusu sınıfına yakın görünüyor.";
+    }
+
+    private static bool IsImplausibleResult(DiskSummary disk, DiskBenchmarkResult result)
+    {
+        var seqRead = ParseSpeedLabel(result.SequentialReadLabel);
+        var seqWrite = ParseSpeedLabel(result.SequentialWriteLabel);
+        var maxSpeed = Math.Max(seqRead, seqWrite);
+        var mediaType = disk.MediaType ?? string.Empty;
+
+        if (mediaType.Contains("HDD", StringComparison.OrdinalIgnoreCase))
+        {
+            return maxSpeed > 350d;
+        }
+
+        if (mediaType.Contains("USB Bellek", StringComparison.OrdinalIgnoreCase))
+        {
+            return maxSpeed > 650d;
+        }
+
+        if (mediaType.Contains("USB SSD", StringComparison.OrdinalIgnoreCase))
+        {
+            return maxSpeed > 950d;
+        }
+
+        if (mediaType.Contains("SSD", StringComparison.OrdinalIgnoreCase) &&
+            !mediaType.Contains("NVMe", StringComparison.OrdinalIgnoreCase))
+        {
+            return maxSpeed > 900d;
+        }
+
+        return false;
+    }
+
+    private static double ParseSpeedLabel(string label)
+    {
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            return 0d;
+        }
+
+        var raw = label.Replace("MB/sn", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace("MB/s", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Trim()
+            .Replace(',', '.');
+
+        return double.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value)
+            ? value
+            : 0d;
     }
 
     private static DiskBenchmarkResult BuildFailureResult(DiskSummary disk, DiskBenchmarkProfileOption profile, string message) =>

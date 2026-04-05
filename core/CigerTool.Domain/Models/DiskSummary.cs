@@ -31,4 +31,5 @@ public sealed record DiskSummary(
     string TemperatureLabel,
     IReadOnlyList<string> HealthHighlights,
     IReadOnlyList<DiskPropertyItem> HealthDetails,
-    IReadOnlyList<DiskSmartAttribute> SmartAttributes);
+    IReadOnlyList<DiskSmartAttribute> SmartAttributes,
+    int DiskNumber);

@@ -1,7 +1,9 @@
 <UserControl x:Class="CigerTool.App.Views.Pages.ToolsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <ScrollViewer VerticalScrollBarVisibility="Auto">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:behaviors="clr-namespace:CigerTool.App.Behaviors">
+  <ScrollViewer VerticalScrollBarVisibility="Auto"
+                behaviors:SmoothScrollBehavior.IsEnabled="True">
     <StackPanel Margin="18">
       <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource AccentPanelBrush}">
         <Grid>
@@ -11,17 +13,9 @@
           </Grid.ColumnDefinitions>
 
           <StackPanel>
-            <TextBlock FontSize="28"
-                       FontWeight="SemiBold"
-                       Foreground="{StaticResource ContentHeadingBrush}"
-                       Text="Kurulum Medyası" />
-            <TextBlock Margin="0,10,0,0"
-                       TextWrapping="Wrap"
-                       Foreground="{StaticResource ContentTextBrush}"
-                       Text="Windows, Linux, WinPE ve araç ISO'larını tek akışta analiz edin, uygun USB hedefini seçin ve doğrudan yazın." />
-            <TextBlock Margin="0,12,0,0"
-                       Foreground="{StaticResource ContentMutedTextBrush}"
-                       Text="{Binding StatusMessage}" />
+            <TextBlock FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource ContentHeadingBrush}" Text="Kurulum Medyası" />
+            <TextBlock Margin="0,10,0,0" TextWrapping="Wrap" Foreground="{StaticResource ContentTextBrush}" Text="Windows, Linux, WinPE ve araç ISO'larını USB'ye yazabilir; Windows kaynaklarını doğrudan hedef diske kurabilirsiniz." />
+            <TextBlock Margin="0,12,0,0" Foreground="{StaticResource ContentMutedTextBrush}" Text="{Binding StatusMessage}" />
           </StackPanel>
 
           <Button Grid.Column="1"
@@ -29,43 +23,22 @@
                   Height="42"
                   VerticalAlignment="Top"
                   Command="{Binding RefreshDevicesCommand}"
-                  Content="USB tara"
+                  Content="Hedefleri yenile"
                   Style="{StaticResource SecondaryActionButtonStyle}" />
         </Grid>
       </Border>
 
       <Border Style="{StaticResource CardBorderStyle}">
         <StackPanel>
-          <TextBlock FontSize="18"
-                     FontWeight="SemiBold"
-                     Foreground="{StaticResource ContentHeadingBrush}"
-                     Text="1. Kaynak seçimi" />
-          <TextBlock Margin="0,10,0,0"
-                     TextWrapping="Wrap"
-                     Foreground="{StaticResource ContentTextBrush}"
-                     Text="Kurulum ISO'su, canlı sistem ISO'su veya yazılabilir disk imajı seçin. Kaynak türü otomatik olarak algılanır." />
+          <TextBlock FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource ContentHeadingBrush}" Text="1. Kaynak dosya" />
+          <TextBlock Margin="0,10,0,0" TextWrapping="Wrap" Foreground="{StaticResource ContentTextBrush}" Text="ISO, WIM, ESD veya yazılabilir disk imajı seçin. Kaynak profili otomatik algılanır." />
 
           <WrapPanel Margin="0,16,0,0">
-            <Button Width="170"
-                    Height="44"
-                    Margin="0,0,12,12"
-                    Command="{Binding BrowseImageCommand}"
-                    Content="ISO / imaj seç"
-                    Style="{StaticResource PrimaryActionButtonStyle}" />
-            <Button Width="130"
-                    Height="44"
-                    Margin="0,0,12,12"
-                    Command="{Binding ClearImageCommand}"
-                    Content="Temizle"
-                    Style="{StaticResource SecondaryActionButtonStyle}" />
+            <Button Width="170" Height="44" Margin="0,0,12,12" Command="{Binding BrowseImageCommand}" Content="Kaynak seç" Style="{StaticResource PrimaryActionButtonStyle}" />
+            <Button Width="120" Height="44" Margin="0,0,12,12" Command="{Binding ClearImageCommand}" Content="Temizle" Style="{StaticResource SecondaryActionButtonStyle}" />
           </WrapPanel>
 
-          <Border Margin="0,16,0,0"
-                  Padding="18"
-                  CornerRadius="18"
-                  Background="{StaticResource SubtlePanelBrush}"
-                  BorderBrush="{StaticResource CardBorderBrush}"
-                  BorderThickness="1">
+          <Border Margin="0,16,0,0" Padding="18" CornerRadius="18" Background="{StaticResource SubtlePanelBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1">
             <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
@@ -73,43 +46,20 @@
               </Grid.ColumnDefinitions>
 
               <StackPanel Margin="0,0,14,0">
-                <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Kaynak" />
-                <TextBlock Margin="0,6,0,0"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource ContentHeadingBrush}"
-                           Text="{Binding Snapshot.Release.ImageName, TargetNullValue=Henüz dosya seçilmedi.}" />
-                <TextBlock Margin="0,10,0,0"
-                           Foreground="{StaticResource ContentMutedTextBrush}"
-                           Text="Önyükleme profili" />
-                <TextBlock Margin="0,6,0,0"
-                           TextWrapping="Wrap"
-                           Foreground="{StaticResource ContentHeadingBrush}"
-                           Text="{Binding Snapshot.Release.BootProfileLabel}" />
-                <TextBlock Margin="0,10,0,0"
-                           Foreground="{StaticResource ContentMutedTextBrush}"
-                           Text="Yazma yöntemi" />
-                <TextBlock Margin="0,6,0,0"
-                           TextWrapping="Wrap"
-                           Foreground="{StaticResource ContentTextBrush}"
-                           Text="{Binding Snapshot.Release.WriteModeLabel}" />
+                <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Kaynak adı" />
+                <TextBlock Margin="0,6,0,0" FontWeight="SemiBold" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding Snapshot.Release.ImageName, TargetNullValue=Henüz dosya seçilmedi.}" />
+                <TextBlock Margin="0,10,0,0" Foreground="{StaticResource ContentMutedTextBrush}" Text="Önyükleme profili" />
+                <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding Snapshot.Release.BootProfileLabel}" />
+                <TextBlock Margin="0,10,0,0" Foreground="{StaticResource ContentMutedTextBrush}" Text="Yöntem" />
+                <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Foreground="{StaticResource ContentTextBrush}" Text="{Binding Snapshot.Release.WriteModeLabel}" />
               </StackPanel>
 
               <StackPanel Grid.Column="1">
                 <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Uyumluluk" />
-                <TextBlock Margin="0,6,0,0"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource ContentHeadingBrush}"
-                           Text="{Binding Snapshot.Release.CompatibilityLabel}" />
-                <TextBlock Margin="0,10,0,0"
-                           TextWrapping="Wrap"
-                           Foreground="{StaticResource ContentTextBrush}"
-                           Text="{Binding Snapshot.Release.CompatibilityDetails}" />
-                <TextBlock Margin="0,10,0,0"
-                           Foreground="{StaticResource ContentMutedTextBrush}"
-                           Text="Bütünlük" />
-                <TextBlock Margin="0,6,0,0"
-                           Foreground="{StaticResource ContentHeadingBrush}"
-                           Text="{Binding Snapshot.Release.ChecksumStatus}" />
+                <TextBlock Margin="0,6,0,0" FontWeight="SemiBold" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding Snapshot.Release.CompatibilityLabel}" />
+                <TextBlock Margin="0,10,0,0" TextWrapping="Wrap" Foreground="{StaticResource ContentTextBrush}" Text="{Binding Snapshot.Release.CompatibilityDetails}" />
+                <TextBlock Margin="0,10,0,0" Foreground="{StaticResource ContentMutedTextBrush}" Text="İş akışı" />
+                <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Foreground="{StaticResource ContentTextBrush}" Text="{Binding SourceWorkflowHint}" />
               </StackPanel>
             </Grid>
           </Border>
@@ -118,38 +68,53 @@
 
       <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource RaisedSurfaceBrush}">
         <StackPanel>
-          <TextBlock FontSize="18"
-                     FontWeight="SemiBold"
-                     Foreground="{StaticResource ContentHeadingBrush}"
-                     Text="2. Hedef USB aygıtı" />
-          <TextBlock Margin="0,10,0,0"
-                     TextWrapping="Wrap"
-                     Foreground="{StaticResource ContentTextBrush}"
-                     Text="Hedef aygıtın tüm verileri silinir. Uygun olmayan aygıtlar güvenlik gerekçesiyle açıklama ile birlikte gösterilir." />
+          <TextBlock FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource ContentHeadingBrush}" Text="2. İşlem türü" />
+          <ComboBox Margin="0,16,0,0"
+                    ItemsSource="{Binding Modes}"
+                    SelectedItem="{Binding SelectedMode}"
+                    ItemTemplate="{StaticResource TitleDescriptionComboItemTemplate}" />
+          <TextBlock Margin="0,12,0,0" TextWrapping="Wrap" Foreground="{StaticResource ContentTextBrush}" Text="{Binding TargetHint}" />
+          <Border Margin="0,14,0,0"
+                  Padding="14"
+                  CornerRadius="16"
+                  Background="{StaticResource SubtlePanelBrush}"
+                  BorderBrush="{StaticResource CardBorderBrush}"
+                  BorderThickness="1">
+            <TextBlock TextWrapping="Wrap"
+                       Foreground="{StaticResource ContentTextBrush}"
+                       Text="{Binding SourceWorkflowHint}" />
+          </Border>
+        </StackPanel>
+      </Border>
 
+      <Border Style="{StaticResource CardBorderStyle}" Visibility="{Binding ShowUsbTargetSelector, Converter={StaticResource BooleanToVisibilityConverter}}">
+        <StackPanel>
+          <TextBlock FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource ContentHeadingBrush}" Text="3. Hedef USB aygıtı" />
           <ListBox Margin="0,16,0,0"
                    MaxHeight="280"
                    ItemsSource="{Binding Snapshot.Devices}"
                    SelectedItem="{Binding SelectedDevice}"
                    ItemTemplate="{StaticResource UsbDeviceComboItemTemplate}" />
+          <TextBlock Margin="0,12,0,0" TextWrapping="Wrap" Foreground="{StaticResource ContentTextBrush}" Text="{Binding SelectedDeviceMessage}" />
+        </StackPanel>
+      </Border>
 
-          <Border Margin="0,16,0,0"
-                  Padding="16"
-                  CornerRadius="18"
-                  Background="{StaticResource SubtlePanelBrush}"
-                  BorderBrush="{StaticResource CardBorderBrush}"
-                  BorderThickness="1">
-            <StackPanel>
-              <TextBlock FontSize="16"
-                         FontWeight="SemiBold"
-                         Foreground="{StaticResource ContentHeadingBrush}"
-                         Text="{Binding SelectedDeviceTitle}" />
-              <TextBlock Margin="0,8,0,0"
-                         TextWrapping="Wrap"
-                         Foreground="{StaticResource ContentTextBrush}"
-                         Text="{Binding SelectedDeviceMessage}" />
-            </StackPanel>
-          </Border>
+      <Border Style="{StaticResource CardBorderStyle}" Visibility="{Binding ShowDiskTargetSelector, Converter={StaticResource BooleanToVisibilityConverter}}">
+        <StackPanel>
+          <TextBlock FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource ContentHeadingBrush}" Text="3. Hedef disk" />
+          <ComboBox Margin="0,16,0,0"
+                    ItemsSource="{Binding DeploymentCandidates}"
+                    SelectedItem="{Binding SelectedTargetDisk}"
+                    ItemTemplate="{StaticResource DiskComboItemTemplate}" />
+          <CheckBox Margin="0,16,0,0"
+                    IsChecked="{Binding PortableModeEnabled}"
+                    Content="Taşınabilir Windows düzeni uygula" />
+          <ComboBox Margin="0,16,0,0"
+                    Visibility="{Binding ShowEditionSelector, Converter={StaticResource BooleanToVisibilityConverter}}"
+                    ItemsSource="{Binding AvailableEditions}"
+                    SelectedItem="{Binding SelectedEdition}"
+                    ItemTemplate="{StaticResource WindowsEditionComboItemTemplate}" />
+          <TextBlock Margin="0,12,0,0" TextWrapping="Wrap" Foreground="{StaticResource ContentTextBrush}" Text="Bu işlem seçilen hedef diski temizler, yeniden bölümlendirir, Windows imajını açar ve önyükleme dosyalarını kurar." />
         </StackPanel>
       </Border>
 
@@ -163,22 +128,16 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel>
-              <TextBlock FontSize="18"
-                         FontWeight="SemiBold"
-                         Foreground="{StaticResource ContentHeadingBrush}"
-                         Text="3. Yazma işlemi" />
-              <TextBlock Margin="0,10,0,0"
-                         TextWrapping="Wrap"
-                         Foreground="{StaticResource ContentTextBrush}"
-                         Text="{Binding ProgressSummary}" />
+              <TextBlock FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource ContentHeadingBrush}" Text="4. İşlem" />
+              <TextBlock Margin="0,10,0,0" TextWrapping="Wrap" Foreground="{StaticResource ContentTextBrush}" Text="{Binding ProgressSummary}" />
             </StackPanel>
 
             <Button Grid.Column="1"
-                    Width="150"
+                    Width="160"
                     Height="44"
                     Margin="12,0,0,0"
-                    Command="{Binding WritePreparedImageCommand}"
-                    Content="USB'yi hazırla"
+                    Command="{Binding StartCommand}"
+                    Content="İşlemi başlat"
                     Style="{StaticResource PrimaryActionButtonStyle}" />
 
             <Button Grid.Column="2"
@@ -191,14 +150,12 @@
           </Grid>
 
           <ProgressBar Margin="0,16,0,0"
-                       Height="16"
+                       Height="18"
                        Minimum="0"
                        Maximum="100"
                        IsIndeterminate="{Binding IsProgressIndeterminate}"
                        Value="{Binding ProgressPercent, Mode=OneWay}" />
-          <TextBlock Margin="0,10,0,0"
-                     Foreground="{StaticResource ContentMutedTextBrush}"
-                     Text="{Binding ProgressDetail}" />
+          <TextBlock Margin="0,10,0,0" Foreground="{StaticResource ContentMutedTextBrush}" Text="{Binding ProgressDetail}" />
         </StackPanel>
       </Border>
     </StackPanel>

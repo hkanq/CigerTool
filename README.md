@@ -31,15 +31,18 @@ Bu depo:
 
 - ham ve akıllı klonlama akışları
 - ham ve akıllı imaj alma / geri yükleme akışları
-- disk sağlık özeti, marka/model, seri, firmware, sektör boyutu ve SMART ayrıntıları
+- disk sağlık özeti, marka/model, seri, firmware, çalışma süresi, okunan/yazılan veri, sektör boyutu ve SMART ayrıntıları
+- HDD için derin yüzey taraması
 - SEQ1M ve RND4K odaklı benchmark
 - CigerTool OS USB hazırlama
 - Windows, Linux, WinPE ve araç ISO'larını USB'ye hazırlama
+- Windows kaynağını hedef USB/SATA diske doğrudan uygulama
 
 ## Dürüst Kalan Sınırlar
 
 - Rufus ile bire bir tüm özel medya senaryoları tamamlanmış değildir
 - CrystalDiskInfo ve CrystalDiskMark ile yüzde yüz aynı telemetri ve rapor yapısı yoktur
+- Linux dağıtımlarını WinToUSB benzeri doğrudan diske kurma akışı henüz tam açılmış değildir
 - üreticiye özel SMART alanları sürücü desteğine göre değişir
 
 ## Doğrulanan Çıktılar
