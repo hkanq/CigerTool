@@ -94,6 +94,11 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
 
     public bool HasRemoteImageSource => !string.IsNullOrWhiteSpace(Snapshot.Release.ImageUrl);
 
+    public bool IsCigerToolSource =>
+        HasRemoteImageSource ||
+        Snapshot.Release.BootProfileLabel.Contains("CigerTool", StringComparison.OrdinalIgnoreCase) ||
+        Snapshot.Release.ImageName.Contains("CigerTool", StringComparison.OrdinalIgnoreCase);
+
     public bool CanClearManualImage =>
         !IsOperationRunning &&
         string.Equals(Snapshot.Release.ModeLabel, "Elle seçilen dosya", StringComparison.OrdinalIgnoreCase);
@@ -104,25 +109,26 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
         !IsOperationRunning &&
         Snapshot.IsAdministrator &&
         SelectedDevice?.CanWrite == true &&
-        ((HasPreparedImage && Snapshot.Release.CanDirectWrite) || HasRemoteImageSource);
+        ((HasPreparedImage && Snapshot.Release.CanDirectWrite && IsCigerToolSource) || HasRemoteImageSource);
 
     public bool CanWritePreparedImage =>
         !IsOperationRunning &&
         Snapshot.IsAdministrator &&
         SelectedDevice?.CanWrite == true &&
         HasPreparedImage &&
-        Snapshot.Release.CanDirectWrite;
+        Snapshot.Release.CanDirectWrite &&
+        IsCigerToolSource;
 
     public bool CanCancelCurrentOperation => IsOperationRunning;
 
     public string SourceStatusLabel =>
         HasPreparedImage
             ? Snapshot.Release.CanDirectWrite
-                ? "İmaj hazır"
+                ? "CigerTool OS imajı hazır"
                 : "Ek hazırlık gerekir"
             : HasRemoteImageSource
                 ? "İndirilmeyi bekliyor"
-                : "Elle dosya seçin";
+                : "Yerel CigerTool OS imajı seçin";
 
     public string SourceStatusMessage
     {
@@ -130,7 +136,9 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
         {
             if (HasPreparedImage)
             {
-                return Snapshot.Release.CompatibilityDetails;
+                return IsCigerToolSource
+                    ? Snapshot.Release.CompatibilityDetails
+                    : "Bu dosya kurulum medyası için uygun görünüyor. Windows, Linux veya WinPE ISO'ları için Kurulum Medyası bölümünü kullanın.";
             }
 
             return Snapshot.Release.Status;
@@ -244,7 +252,7 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
         var dialog = new OpenFileDialog
         {
             Title = "CigerTool OS imajını seçin",
-            Filter = "Desteklenen imajlar|*.img;*.iso;*.bin;*.raw;*.wim|Tüm dosyalar|*.*",
+            Filter = "CigerTool OS imajları|*.img;*.iso;*.bin;*.raw|Tüm dosyalar|*.*",
             CheckFileExists = true,
             Multiselect = false
         };
@@ -258,6 +266,11 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
         var setResult = _usbCreationService.SetManualImagePath(dialog.FileName);
         StatusMessage = setResult.Message;
         await RefreshReleaseAsync();
+
+        if (!IsCigerToolSource && HasPreparedImage)
+        {
+            StatusMessage = "Bu kaynak CigerTool OS yerine kurulum medyası gibi algılandı. Windows, Linux veya WinPE ISO'ları için Kurulum Medyası bölümünü kullanın.";
+        }
     }
 
     private async Task ClearManualImageAsync()
@@ -472,6 +485,7 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
         RaisePropertyChanged(nameof(HasUsbDevices));
         RaisePropertyChanged(nameof(HasPreparedImage));
         RaisePropertyChanged(nameof(HasRemoteImageSource));
+        RaisePropertyChanged(nameof(IsCigerToolSource));
         RaiseDerivedStateChanged();
     }
 
@@ -498,6 +512,7 @@ public sealed class UsbCreatorPageViewModel : ViewModelBase
         RaisePropertyChanged(nameof(CanDownloadAndWrite));
         RaisePropertyChanged(nameof(CanWritePreparedImage));
         RaisePropertyChanged(nameof(CanCancelCurrentOperation));
+        RaisePropertyChanged(nameof(IsCigerToolSource));
         RaisePropertyChanged(nameof(SourceStatusLabel));
         RaisePropertyChanged(nameof(SourceStatusMessage));
         RaisePropertyChanged(nameof(SelectedDeviceTitle));

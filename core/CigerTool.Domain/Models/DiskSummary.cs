@@ -23,4 +23,12 @@ public sealed record DiskSummary(
     string WarningSummary,
     int UsagePercent,
     bool IsRemovable,
-    bool SupportsRawAccess);
+    bool SupportsRawAccess,
+    string Brand,
+    string SerialNumber,
+    string FirmwareVersion,
+    string HealthScoreLabel,
+    string TemperatureLabel,
+    IReadOnlyList<string> HealthHighlights,
+    IReadOnlyList<DiskPropertyItem> HealthDetails,
+    IReadOnlyList<DiskSmartAttribute> SmartAttributes);

@@ -28,14 +28,14 @@ public sealed class DisksPageViewModel : ViewModelBase
         _diskInventoryService = diskInventoryService;
         _diskBenchmarkService = diskBenchmarkService;
         _snapshot = diskInventoryService.GetSnapshot();
-        _statusMessage = "Sürücü listesi hazır.";
+        _statusMessage = "Disk listesi ve sağlık özeti hazır.";
 
         BenchmarkProfiles =
         [
-            new DiskBenchmarkProfileOption("quick", "Hızlı benchmark", "256 MB test dosyasıyla kısa sıralı ve 4K rastgele ölçüm yapar.", 256L * 1024 * 1024, 12_000),
-            new DiskBenchmarkProfileOption("standard", "Standart benchmark", "1 GB test dosyasıyla günlük kullanım için daha kararlı sıralı ve 4K sonuç verir.", 1024L * 1024 * 1024, 24_000),
-            new DiskBenchmarkProfileOption("deep", "Derin benchmark", "4 GB test dosyasıyla daha uzun okuma-yazma ve 4K rastgele ölçüm yapar.", 4L * 1024 * 1024 * 1024, 48_000),
-            new DiskBenchmarkProfileOption("stress", "Sürdürülebilir hız testi", "8 GB test dosyasıyla özellikle SSD önbelleği ve uzun yazma davranışını daha görünür hale getirir.", 8L * 1024 * 1024 * 1024, 96_000)
+            new DiskBenchmarkProfileOption("quick", "Hızlı test", "Kısa sürede temel SEQ1M ve RND4K Q1T1 sonucu verir.", 256L * 1024 * 1024, 12_000),
+            new DiskBenchmarkProfileOption("standard", "Standart test", "Günlük kullanım için dengeli ve daha kararlı ölçüm alır.", 1024L * 1024 * 1024, 24_000),
+            new DiskBenchmarkProfileOption("deep", "Derin test", "Daha uzun çalışır, önbellek etkisini azaltmaya yardımcı olur.", 4L * 1024 * 1024 * 1024, 48_000),
+            new DiskBenchmarkProfileOption("stress", "Süreklilik testi", "Uzun yazma davranışını ve SSD önbellek düşüşünü daha görünür hale getirir.", 8L * 1024 * 1024 * 1024, 96_000)
         ];
 
         _selectedBenchmarkProfile = BenchmarkProfiles[0];
@@ -121,7 +121,7 @@ public sealed class DisksPageViewModel : ViewModelBase
 
     public double BenchmarkProgressPercent => CurrentBenchmarkProgress?.Percent ?? 0;
 
-    public string BenchmarkProgressSummary => CurrentBenchmarkProgress?.Summary ?? "Seçilen sürücüde performans testi başlatıldığında ilerleme burada görünür.";
+    public string BenchmarkProgressSummary => CurrentBenchmarkProgress?.Summary ?? "Seçilen diskte test başlatıldığında ilerleme burada görünür.";
 
     public string BenchmarkProgressDetail
     {
@@ -129,7 +129,7 @@ public sealed class DisksPageViewModel : ViewModelBase
         {
             if (CurrentBenchmarkProgress is null)
             {
-                return "Henüz çalışan performans testi yok.";
+                return "Henüz çalışan benchmark yok.";
             }
 
             return $"{CurrentBenchmarkProgress.ProcessedLabel} / {CurrentBenchmarkProgress.TotalLabel} · {CurrentBenchmarkProgress.SpeedLabel} · Kalan {CurrentBenchmarkProgress.RemainingLabel}";

@@ -76,7 +76,15 @@ public sealed class CloneAnalysisWorkflowServiceTests
             WarningSummary: "Hazır",
             UsagePercent: (int)Math.Round((double)usedBytes / totalBytes * 100d),
             IsRemovable: false,
-            SupportsRawAccess: true);
+            SupportsRawAccess: true,
+            Brand: "Test",
+            SerialNumber: "TEST123",
+            FirmwareVersion: "1.0",
+            HealthScoreLabel: "%100",
+            TemperatureLabel: "30 °C",
+            HealthHighlights: ["Belirgin bir risk sinyali yok."],
+            HealthDetails: [new DiskPropertyItem("Marka", "Test")],
+            SmartAttributes: []);
     }
 
     private sealed class FakeDiskInventoryService(IReadOnlyList<DiskSummary> disks) : IDiskInventoryService

@@ -2,77 +2,34 @@
 
 ## Son Tur Özeti
 
-Bu turda kalan büyük hedefler üzerinde üç ana iş tamamlandı:
+Bu turda dört ana düzeltme tamamlandı:
 
-- standart ISO kaynakları için gerçek USB hazırlama akışı açıldı
-- menüye `Ek Özellikler` modülü eklendi
-- disk sağlığı ve benchmark yüzeyi daha net sınıflar ve profillerle güçlendirildi
+- `CigerTool OS USB` ile `Kurulum Medyası` akışları birbirinden ayrıldı
+- disk sağlık ekranı gerçek ayrıntı katmanıyla güçlendirildi
+- benchmark motoru daha güvenilir yerel Windows ölçümüne taşındı
+- koyu tema, seçim alanları ve ilerleme çubukları yeniden düzenlendi
 
-## Bu Turda Tamamlananlar
+## Tamamlananlar
 
-### USB Ortamı Oluştur
-
-- hibrit ISO dışındaki standart ISO kaynakları için otomatik hazırlama akışı eklendi
-- Windows, Linux, WinPE, araç/test ve CigerTool OS kaynakları daha net profillendiriliyor
-- Windows kurulum ISO'sunda büyük `install.wim` varsa FAT32 uyumluluğu için bölme akışı uygulanabiliyor
-- hibrit ISO kaynakları için mevcut doğrudan sektör yazma akışı korunuyor
-- USB hedef seçimi görünür liste düzeninde kalıyor
-
-### Ek Özellikler
-
-- menüye yeni `Ek Özellikler` kartı eklendi
-- gelişmiş tanılama, benchmark ve isteğe bağlı yardımcılar bu bölümde toplandı
-- isteğe bağlı araçların çekirdek işlevlerden ayrı olduğu daha net hale getirildi
-
-### Diskler ve Sağlık
-
-- SSD/NVMe, HDD ve USB/harici sınıfları özet kartlarda daha görünür
-- risk / izleme sayıları özetleniyor
-- benchmark tarafına `Sürdürülebilir hız testi` profili eklendi
-
-### Başlangıç Denetimi
-
-- standart ISO hazırlama için gereken Windows bileşenleri başlangıç denetimine eklendi
-
-## Doğrulanan Çıktılar
-
-Bu tur sonunda gerçekten doğrulanan yeni build çıktıları:
-
-- [CigerTool.exe](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/artifacts/final/app/CigerTool.exe)
-- [CigerTool.WinPE.exe](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/artifacts/final/winpe/CigerTool.WinPE.exe)
-
-Not:
-
-- `artifacts/app` ve `artifacts/winpe` altındaki canlı süreçler dosyayı kilitlediyse yeni doğrulanmış build `artifacts/final` altında üretilir
+- menüde `Kurulum Medyası` bölümü açıldı
+- `USB Ortamı Oluştur` akışı CigerTool OS odağına çekildi
+- her disk için sağlık puanı, sıcaklık, seri no, firmware, bağlantı ve SMART listesi gösterilebilir hale geldi
+- benchmark ekranı SEQ1M / RND4K Q1T1 görünümüne yaklaştırıldı
+- build, test ve publish tekrar alındı
 
 ## Doğrulama
 
-Bu tur sonunda başarılı geçen komutlar:
-
 - `dotnet build CigerTool.sln -c Release`
 - `dotnet test CigerTool.sln -c Release --no-build`
-- iki ayrı `dotnet publish` çağrısıyla yeni final çıktı üretimi
+- `powershell -ExecutionPolicy Bypass -File build/scripts/Publish-CigerTool.ps1`
 
-## Bilinen Kalan Riskler
+## Güncel Çıktılar
 
-- standart ISO hazırlama akışı daha güçlü hale geldi, ancak Rufus ile bire bir tüm özel medya senaryoları hâlâ tamamlanmış değildir
-- üreticiye özel SMART ayrıntıları ve Crystal seviyesinde tam telemetri hâlâ sınırlıdır
-- geniş donanım çeşitliliğinde USB köprü denetleyicileri için daha çok gerçek cihaz testi gerekir
+- [CigerTool.exe](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/artifacts/app/CigerTool.exe)
+- [CigerTool.WinPE.exe](C:/Users/Radius%20Admin/Desktop/codex/CigerTool/artifacts/winpe/CigerTool.WinPE.exe)
 
-## Bilinçli Ürün Sınırı
+## Dürüst Kalan Sınırlar
 
-Bu depo:
-
-- WinPE üretmez
-- Windows ADK kurmaz
-- `boot.wim` oluşturmaz
-- işletim sistemi imajı üretmez
-
-Bu depo yalnızca:
-
-- uygulamayı
-- yayın kaynağı modelini
-- USB oluşturma akışını
-- WinPE içine yerleştirme sözleşmesini
-
-taşır.
+- üreticiye özel SMART çözümleri CrystalDiskInfo ile bire bir aynı değildir
+- benchmark artık çok daha gerçekçi olsa da CrystalDiskMark ile yüzde yüz aynı profil motoru değildir
+- Rufus’un tüm özel medya varyasyonları ve çoklu önyükleme senaryoları hâlâ ayrı bir genişletme alanıdır

@@ -37,8 +37,8 @@ public sealed class ShellViewModel : ViewModelBase
             OperationSeverity.Warning => "Gözden geçirilecek noktalar var",
             _ => "Kullanıma hazır"
         };
-        EditionLabel = environmentProfile.IsWinPe ? "CigerTool OS" : "Windows Uygulaması";
-        ProductTagline = "Klonlama, yedekleme, imaj alma ve USB hazırlığı tek yerde.";
+        EditionLabel = environmentProfile.IsWinPe ? "CigerTool OS" : "Windows uygulaması";
+        ProductTagline = "Klonlama, yedekleme, sağlık ve kurulum medyası tek yerde.";
         WindowSubtitle = environmentProfile.IsWinPe
             ? "Bakım ve kurtarma işlemleri için optimize edilmiş çalışma alanı"
             : "Günlük kullanım ve servis işlemleri için hazır çalışma alanı";
@@ -60,9 +60,9 @@ public sealed class ShellViewModel : ViewModelBase
             new(NavigationTarget.Dashboard, "Ana Sayfa", "Durum, öneriler ve son işlemler", "\uE80F"),
             new(NavigationTarget.Cloning, "Klonlama", "Bir diski başka bir diske taşıyın", "\uE7C5"),
             new(NavigationTarget.BackupImage, "Yedekleme ve İmaj", "İmaj alın, geri yükleyin ve dönüştürün", "\uE823"),
-            new(NavigationTarget.Disks, "Diskler ve Sağlık", "Bağlı diskleri ve sağlık durumlarını görün", "\uEDA2"),
-            new(NavigationTarget.UsbCreator, "USB Ortamı Oluştur", "Kurulum ve canlı ortam USB'lerini hazırlayın", "\uE88E"),
-            new(NavigationTarget.Extras, "Ek Özellikler", "Gelişmiş tanılama, benchmark ve yardımcılar", "\uE9CE"),
+            new(NavigationTarget.Disks, "Diskler ve Sağlık", "Bağlı diskleri ve sağlık ayrıntılarını görün", "\uEDA2"),
+            new(NavigationTarget.UsbCreator, "CigerTool OS USB", "CigerTool OS ortamını indirip USB'ye yazın", "\uE88E"),
+            new(NavigationTarget.Extras, "Kurulum Medyası", "Windows, Linux, WinPE ve araç ISO'larını USB'ye hazırlayın", "\uE7B8"),
             new(NavigationTarget.Logs, "Günlükler", "İşlem kayıtlarını inceleyin", "\uE9D2"),
             new(NavigationTarget.Settings, "Ayarlar", "Uygulama tercihleri ve destek bilgileri", "\uE713")
         };
@@ -83,19 +83,12 @@ public sealed class ShellViewModel : ViewModelBase
     }
 
     public string ProductName { get; }
-
     public string ReadinessLabel { get; }
-
     public string EditionLabel { get; }
-
     public string ProductTagline { get; }
-
     public string WindowSubtitle { get; }
-
     public AppEnvironmentProfile EnvironmentProfile { get; }
-
     public ObservableCollection<NavigationItemViewModel> NavigationItems { get; }
-
     public ICommand NavigateCommand { get; }
 
     public object CurrentPage
@@ -124,7 +117,6 @@ public sealed class ShellViewModel : ViewModelBase
         }
 
         CurrentPage = GetOrCreatePage(target);
-
         var selected = NavigationItems.First(item => item.Target == target);
         CurrentPageTitle = selected.Title;
         CurrentPageSubtitle = selected.Subtitle;

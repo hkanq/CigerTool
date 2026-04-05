@@ -15,11 +15,11 @@
             <TextBlock FontSize="28"
                        FontWeight="SemiBold"
                        Foreground="{StaticResource ContentHeadingBrush}"
-                       Text="{Binding Snapshot.Heading}" />
+                       Text="CigerTool OS USB" />
             <TextBlock Margin="0,10,0,0"
                        TextWrapping="Wrap"
                        Foreground="{StaticResource ContentTextBrush}"
-                       Text="Kaynak otomatik olarak sorgulanır, uygun USB hedefleri listelenir ve indirme ile yazma işlemi tek akışta tamamlanır." />
+                       Text="CigerTool OS sürümünü otomatik sorgulayın, doğrulayın ve tek akışta hedef USB'ye yazın." />
             <TextBlock Margin="0,12,0,0"
                        Foreground="{StaticResource ContentMutedTextBrush}"
                        Text="{Binding StatusMessage}" />
@@ -31,11 +31,11 @@
                   Margin="16,0,0,0"
                   VerticalAlignment="Top"
                   Command="{Binding RefreshReleaseCommand}"
-                  Content="Kaynağı yenile"
+                  Content="Sürümü yenile"
                   Style="{StaticResource SecondaryActionButtonStyle}" />
 
           <Button Grid.Column="2"
-                  Width="130"
+                  Width="120"
                   Height="42"
                   Margin="12,0,0,0"
                   VerticalAlignment="Top"
@@ -53,7 +53,7 @@
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
           <DataTemplate>
-            <Border Width="270" Style="{StaticResource CardBorderStyle}">
+            <Border Width="260" Style="{StaticResource CardBorderStyle}">
               <StackPanel>
                 <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="{Binding Label}" />
                 <TextBlock Margin="0,8,0,0"
@@ -76,96 +76,61 @@
           <TextBlock FontSize="18"
                      FontWeight="SemiBold"
                      Foreground="{StaticResource ContentHeadingBrush}"
-                     Text="1. Ortam kaynağı" />
+                     Text="1. CigerTool OS kaynağı" />
 
-          <Grid Margin="0,16,0,0">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="2*" />
-              <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+          <Border Margin="0,16,0,0"
+                  Padding="18"
+                  CornerRadius="18"
+                  Background="{StaticResource SubtlePanelBrush}"
+                  BorderBrush="{StaticResource CardBorderBrush}"
+                  BorderThickness="1">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
 
-            <StackPanel Margin="0,0,18,0">
-              <TextBlock FontSize="16"
-                         FontWeight="SemiBold"
-                         Foreground="{StaticResource ContentHeadingBrush}"
-                         Text="{Binding SourceStatusLabel}" />
-              <TextBlock Margin="0,8,0,0"
-                         TextWrapping="Wrap"
-                         Foreground="{StaticResource ContentTextBrush}"
-                         Text="{Binding SourceStatusMessage}" />
-              <TextBlock Margin="0,12,0,0"
-                         TextWrapping="Wrap"
-                         Foreground="{StaticResource ContentMutedTextBrush}"
-                         Text="{Binding Snapshot.Release.Notes}" />
-            </StackPanel>
-
-            <Border Grid.Column="1"
-                    Padding="14"
-                    CornerRadius="18"
-                    Background="{StaticResource SubtlePanelBrush}"
-                    BorderBrush="{StaticResource CardBorderBrush}"
-                    BorderThickness="1">
-              <StackPanel>
+              <StackPanel Margin="0,0,14,0">
                 <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Kaynak türü" />
                 <TextBlock Margin="0,6,0,0"
                            FontWeight="SemiBold"
                            Foreground="{StaticResource ContentHeadingBrush}"
                            Text="{Binding Snapshot.Release.ModeLabel}" />
-
-                <TextBlock Margin="0,12,0,0"
+                <TextBlock Margin="0,10,0,0"
                            Foreground="{StaticResource ContentMutedTextBrush}"
                            Text="Sürüm" />
                 <TextBlock Margin="0,6,0,0"
                            FontWeight="SemiBold"
                            Foreground="{StaticResource ContentHeadingBrush}"
                            Text="{Binding Snapshot.Release.Version}" />
-
-                <TextBlock Margin="0,12,0,0"
-                           Foreground="{StaticResource ContentMutedTextBrush}"
-                           Text="Kaynak biçimi" />
-                <TextBlock Margin="0,6,0,0"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource ContentHeadingBrush}"
-                           Text="{Binding Snapshot.Release.SourceFormatLabel}" />
-
-                <TextBlock Margin="0,12,0,0"
-                           Foreground="{StaticResource ContentMutedTextBrush}"
-                           Text="Önyükleme profili" />
-                <TextBlock Margin="0,6,0,0"
-                           TextWrapping="Wrap"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource ContentHeadingBrush}"
-                           Text="{Binding Snapshot.Release.BootProfileLabel}" />
-
-                <TextBlock Margin="0,12,0,0"
-                           Foreground="{StaticResource ContentMutedTextBrush}"
-                           Text="Yazma yöntemi" />
-                <TextBlock Margin="0,6,0,0"
-                           TextWrapping="Wrap"
-                           Foreground="{StaticResource ContentHeadingBrush}"
-                           Text="{Binding Snapshot.Release.WriteModeLabel}" />
-
-                <TextBlock Margin="0,12,0,0"
-                           Foreground="{StaticResource ContentMutedTextBrush}"
-                           Text="Uyumluluk" />
-                <TextBlock Margin="0,6,0,0"
-                           TextWrapping="Wrap"
-                           Foreground="{StaticResource ContentTextBrush}"
-                           Text="{Binding Snapshot.Release.CompatibilityLabel}" />
-
-                <TextBlock Margin="0,12,0,0"
+                <TextBlock Margin="0,10,0,0"
                            Foreground="{StaticResource ContentMutedTextBrush}"
                            Text="İmaj" />
                 <TextBlock Margin="0,6,0,0"
                            TextWrapping="Wrap"
                            Foreground="{StaticResource ContentHeadingBrush}"
                            Text="{Binding Snapshot.Release.ImageName}" />
-                <TextBlock Margin="0,6,0,0"
-                           Foreground="{StaticResource ContentMutedTextBrush}"
-                           Text="{Binding Snapshot.Release.ImageSizeLabel}" />
               </StackPanel>
-            </Border>
-          </Grid>
+
+              <StackPanel Grid.Column="1">
+                <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Durum" />
+                <TextBlock Margin="0,6,0,0"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource ContentHeadingBrush}"
+                           Text="{Binding SourceStatusLabel}" />
+                <TextBlock Margin="0,10,0,0"
+                           TextWrapping="Wrap"
+                           Foreground="{StaticResource ContentTextBrush}"
+                           Text="{Binding SourceStatusMessage}" />
+                <TextBlock Margin="0,10,0,0"
+                           Foreground="{StaticResource ContentMutedTextBrush}"
+                           Text="Bütünlük" />
+                <TextBlock Margin="0,6,0,0"
+                           Foreground="{StaticResource ContentHeadingBrush}"
+                           Text="{Binding Snapshot.Release.ChecksumStatus}" />
+              </StackPanel>
+            </Grid>
+          </Border>
 
           <WrapPanel Margin="0,16,0,0">
             <Button Width="210"
@@ -182,25 +147,11 @@
                     Content="Sadece indir"
                     Style="{StaticResource SecondaryActionButtonStyle}" />
 
-            <Button Width="160"
+            <Button Width="220"
                     Height="44"
                     Margin="0,0,12,12"
                     Command="{Binding BrowseManualImageCommand}"
-                    Content="Manuel dosya seç"
-                    Style="{StaticResource SecondaryActionButtonStyle}" />
-
-            <Button Width="180"
-                    Height="44"
-                    Margin="0,0,12,12"
-                    Command="{Binding WritePreparedImageCommand}"
-                    Content="Hazır imajı yaz"
-                    Style="{StaticResource SecondaryActionButtonStyle}" />
-
-            <Button Width="130"
-                    Height="44"
-                    Margin="0,0,12,12"
-                    Command="{Binding ClearManualImageCommand}"
-                    Content="Seçimi temizle"
+                    Content="Yerel CigerTool OS imajı seç"
                     Style="{StaticResource SecondaryActionButtonStyle}" />
           </WrapPanel>
         </StackPanel>
@@ -217,16 +168,7 @@
                      Foreground="{StaticResource ContentTextBrush}"
                      Text="{Binding UsbDiscoveryHint}" />
 
-          <TextBlock Margin="0,12,0,0"
-                     TextWrapping="Wrap"
-                     Foreground="{StaticResource ContentMutedTextBrush}"
-                     Text="{Binding Snapshot.Release.CompatibilityDetails}" />
-
-          <TextBlock Margin="0,16,0,0"
-                     Foreground="{StaticResource ContentMutedTextBrush}"
-                     Text="{Binding Snapshot.Devices.Count, StringFormat=Bulunan USB aygıtı: {0}}" />
-
-          <ListBox Margin="0,12,0,0"
+          <ListBox Margin="0,16,0,0"
                    MaxHeight="260"
                    ItemsSource="{Binding Snapshot.Devices}"
                    SelectedItem="{Binding SelectedDevice}"
@@ -284,7 +226,7 @@
           </Grid>
 
           <ProgressBar Margin="0,16,0,0"
-                       Height="14"
+                       Height="16"
                        Minimum="0"
                        Maximum="100"
                        IsIndeterminate="{Binding IsProgressIndeterminate}"
@@ -292,83 +234,8 @@
           <TextBlock Margin="0,10,0,0"
                      Foreground="{StaticResource ContentMutedTextBrush}"
                      Text="{Binding ProgressDetail}" />
-          <TextBlock Margin="0,8,0,0"
-                     TextWrapping="Wrap"
-                     Foreground="{StaticResource ContentMutedTextBrush}"
-                     Text="{Binding CurrentOperationProgress.CurrentItem, TargetNullValue=İndirilen veya doğrulanan öğe bilgisi burada gösterilir.}" />
         </StackPanel>
       </Border>
-
-      <Expander Margin="0,8,0,14"
-                Background="{StaticResource RaisedSurfaceBrush}"
-                BorderBrush="{StaticResource CardBorderBrush}"
-                BorderThickness="1"
-                Padding="16"
-                Header="Teknik ayrıntılar"
-                IsExpanded="False">
-        <StackPanel Margin="0,12,0,0">
-          <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Kaynak açıklaması" />
-          <TextBlock Margin="0,6,0,0"
-                     TextWrapping="Wrap"
-                     Foreground="{StaticResource ContentTextBrush}"
-                     Text="{Binding Snapshot.Release.SourceDescription}" />
-
-          <TextBlock Margin="0,12,0,0"
-                     Foreground="{StaticResource ContentMutedTextBrush}"
-                     Text="İndirme adresi" />
-          <TextBlock Margin="0,6,0,0"
-                     TextWrapping="Wrap"
-                     Foreground="{StaticResource ContentTextBrush}"
-                     Text="{Binding Snapshot.Release.ImageUrl, TargetNullValue=Bu kaynakta doğrudan indirme adresi kullanılmıyor.}" />
-
-          <TextBlock Margin="0,12,0,0"
-                     Foreground="{StaticResource ContentMutedTextBrush}"
-                     Text="Hazır imaj yolu" />
-          <TextBlock Margin="0,6,0,0"
-                     TextWrapping="Wrap"
-                     Foreground="{StaticResource ContentTextBrush}"
-                     Text="{Binding Snapshot.Release.PreparedImagePath, TargetNullValue=Henüz yerel imaj yolu yok.}" />
-
-          <TextBlock Margin="0,12,0,0"
-                     Foreground="{StaticResource ContentMutedTextBrush}"
-                     Text="Beklenen SHA-256" />
-          <TextBlock Margin="0,6,0,0"
-                     TextWrapping="Wrap"
-                     Foreground="{StaticResource ContentTextBrush}"
-                     Text="{Binding Snapshot.Release.ExpectedSha256, TargetNullValue=Beklenen SHA-256 bilgisi yok.}" />
-
-          <TextBlock Margin="0,12,0,0"
-                     Foreground="{StaticResource ContentMutedTextBrush}"
-                     Text="Hesaplanan SHA-256" />
-          <TextBlock Margin="0,6,0,0"
-                     TextWrapping="Wrap"
-                     Foreground="{StaticResource ContentTextBrush}"
-                     Text="{Binding Snapshot.Release.CalculatedSha256, TargetNullValue=Henüz hesaplanmadı.}" />
-
-          <TextBlock Margin="0,12,0,0"
-                     Foreground="{StaticResource ContentMutedTextBrush}"
-                     Text="Bütünlük durumu" />
-          <TextBlock Margin="0,6,0,0"
-                     TextWrapping="Wrap"
-                     Foreground="{StaticResource ContentHeadingBrush}"
-                     Text="{Binding Snapshot.Release.ChecksumStatus}" />
-
-          <TextBlock Margin="0,12,0,0"
-                     Foreground="{StaticResource ContentMutedTextBrush}"
-                     Text="İzlenen adımlar" />
-          <ItemsControl Margin="0,8,0,0"
-                        ItemsSource="{Binding Snapshot.Requirements}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <TextBlock Margin="0,0,0,8"
-                           TextWrapping="Wrap"
-                           Foreground="{StaticResource ContentTextBrush}"
-                           Text="{Binding}" />
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </StackPanel>
-      </Expander>
     </StackPanel>
   </ScrollViewer>
 </UserControl>

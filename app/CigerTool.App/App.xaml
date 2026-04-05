@@ -33,11 +33,16 @@
                      FontWeight="SemiBold"
                      Foreground="{StaticResource ContentHeadingBrush}"
                      Text="{Binding Name}" />
-          <TextBlock Grid.Column="1"
-                     Margin="12,0,0,0"
-                     VerticalAlignment="Center"
-                     Foreground="{StaticResource TagTextBrush}"
-                     Text="{Binding CapacityLabel}" />
+          <StackPanel Grid.Column="1" Margin="12,0,0,0">
+            <TextBlock VerticalAlignment="Center"
+                       HorizontalAlignment="Right"
+                       Foreground="{StaticResource TagTextBrush}"
+                       Text="{Binding CapacityLabel}" />
+            <TextBlock Margin="0,4,0,0"
+                       HorizontalAlignment="Right"
+                       Foreground="{StaticResource ContentMutedTextBrush}"
+                       Text="{Binding TemperatureLabel}" />
+          </StackPanel>
 
           <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,6,0,0">
             <TextBlock Foreground="{StaticResource ContentMutedTextBrush}"
@@ -54,6 +59,12 @@
                       Background="{StaticResource TagSurfaceBrush}"
                       CornerRadius="10">
                 <TextBlock Foreground="{StaticResource TagTextBrush}" Text="{Binding HealthLabel}" />
+              </Border>
+              <Border Margin="0,0,8,0"
+                      Padding="8,4"
+                      Background="{StaticResource TagSurfaceBrush}"
+                      CornerRadius="10">
+                <TextBlock Foreground="{StaticResource TagTextBrush}" Text="{Binding HealthScoreLabel}" />
               </Border>
               <Border Margin="0,0,8,0"
                       Padding="8,4"

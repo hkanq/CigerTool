@@ -30,21 +30,21 @@
   </Style>
 
   <Style x:Key="PrimaryActionButtonStyle" TargetType="Button">
-    <Setter Property="Foreground" Value="#08101D" />
+    <Setter Property="Foreground" Value="#11161F" />
     <Setter Property="Background" Value="{StaticResource AccentBrush}" />
     <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="Padding" Value="16,11" />
+    <Setter Property="Padding" Value="18,12" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="Button">
-          <Border Background="{TemplateBinding Background}" CornerRadius="16">
+          <Border Background="{TemplateBinding Background}" CornerRadius="14">
             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-              <Setter Property="Background" Value="#E0B05A" />
+              <Setter Property="Background" Value="#EDAA54" />
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
               <Setter Property="Background" Value="{StaticResource AccentDarkBrush}" />
@@ -63,7 +63,7 @@
     <Setter Property="Background" Value="{StaticResource RaisedSurfaceBrush}" />
     <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="Padding" Value="16,11" />
+    <Setter Property="Padding" Value="18,12" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Template">
@@ -72,7 +72,7 @@
           <Border Background="{TemplateBinding Background}"
                   BorderBrush="{TemplateBinding BorderBrush}"
                   BorderThickness="{TemplateBinding BorderThickness}"
-                  CornerRadius="16">
+                  CornerRadius="14">
             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Border>
           <ControlTemplate.Triggers>
@@ -93,8 +93,8 @@
   </Style>
 
   <Style x:Key="CardBorderStyle" TargetType="Border">
-    <Setter Property="CornerRadius" Value="24" />
-    <Setter Property="Padding" Value="18" />
+    <Setter Property="CornerRadius" Value="22" />
+    <Setter Property="Padding" Value="20" />
     <Setter Property="Background" Value="{StaticResource CardSurfaceBrush}" />
     <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
@@ -106,7 +106,7 @@
     <Setter Property="Background" Value="{StaticResource InputSurfaceBrush}" />
     <Setter Property="BorderBrush" Value="{StaticResource InputBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="Padding" Value="16,10" />
+    <Setter Property="Padding" Value="16,12" />
     <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}" />
     <Setter Property="Template">
       <Setter.Value>
@@ -115,7 +115,7 @@
                   Background="{TemplateBinding Background}"
                   BorderBrush="{TemplateBinding BorderBrush}"
                   BorderThickness="{TemplateBinding BorderThickness}"
-                  CornerRadius="16">
+                  CornerRadius="14">
             <ScrollViewer x:Name="PART_ContentHost"
                           Margin="{TemplateBinding Padding}" />
           </Border>
@@ -258,13 +258,13 @@
                   Background="{TemplateBinding Background}"
                   BorderBrush="{TemplateBinding BorderBrush}"
                   BorderThickness="{TemplateBinding BorderThickness}"
-                  CornerRadius="20">
+                  CornerRadius="16">
             <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="54" />
               </Grid.ColumnDefinitions>
-              <ContentPresenter Margin="16,8,12,8"
+              <ContentPresenter Margin="16,10,12,10"
                                 VerticalAlignment="Center"
                                 Content="{TemplateBinding Content}"
                                 ContentTemplate="{TemplateBinding ContentTemplate}" />
@@ -273,7 +273,7 @@
                       Background="{StaticResource AccentSoftBrush}"
                       BorderBrush="{StaticResource InputBorderBrush}"
                       BorderThickness="1,0,0,0"
-                      CornerRadius="0,18,18,0">
+                      CornerRadius="0,14,14,0">
                 <TextBlock VerticalAlignment="Center"
                            HorizontalAlignment="Center"
                            FontFamily="Segoe MDL2 Assets"
@@ -305,7 +305,7 @@
     <Setter Property="BorderBrush" Value="{StaticResource InputBorderBrush}" />
     <Setter Property="BorderThickness" Value="2" />
     <Setter Property="Padding" Value="0" />
-    <Setter Property="MinHeight" Value="60" />
+    <Setter Property="MinHeight" Value="56" />
     <Setter Property="SnapsToDevicePixels" Value="True" />
     <Setter Property="Template">
       <Setter.Value>
@@ -335,7 +335,7 @@
                       Background="{StaticResource PopupSurfaceBrush}"
                       BorderBrush="{StaticResource AccentBrush}"
                       BorderThickness="1"
-                      CornerRadius="20">
+                      CornerRadius="16">
                 <ScrollViewer Margin="6"
                               SnapsToDevicePixels="True">
                   <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
@@ -417,7 +417,7 @@
                   Background="{StaticResource InputSurfaceBrush}"
                   BorderBrush="{StaticResource InputBorderBrush}"
                   BorderThickness="2"
-                  CornerRadius="18">
+                  CornerRadius="16">
             <ContentPresenter />
           </Border>
           <ControlTemplate.Triggers>
@@ -444,17 +444,26 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="ProgressBar">
-          <Border Background="{TemplateBinding Background}" CornerRadius="999">
-            <Grid x:Name="PART_Track" ClipToBounds="True">
+          <Border Background="{TemplateBinding Background}"
+                  CornerRadius="10"
+                  BorderBrush="{StaticResource CardBorderBrush}"
+                  BorderThickness="1">
+            <Grid x:Name="PART_Track" ClipToBounds="True" Margin="1">
               <Border x:Name="PART_Indicator"
                       HorizontalAlignment="Left"
-                      Background="{TemplateBinding Foreground}"
-                      CornerRadius="999" />
+                      CornerRadius="9">
+                <Border.Background>
+                  <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Color="#F2B35E" Offset="0" />
+                    <GradientStop Color="#E39A3B" Offset="1" />
+                  </LinearGradientBrush>
+                </Border.Background>
+              </Border>
             </Grid>
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsIndeterminate" Value="True">
-              <Setter TargetName="PART_Indicator" Property="Width" Value="120" />
+              <Setter TargetName="PART_Indicator" Property="Width" Value="150" />
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>

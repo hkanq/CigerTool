@@ -42,7 +42,7 @@
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
           <DataTemplate>
-            <Border Width="270" Style="{StaticResource CardBorderStyle}">
+            <Border Width="250" Style="{StaticResource CardBorderStyle}">
               <StackPanel>
                 <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="{Binding Label}" />
                 <TextBlock Margin="0,8,0,0"
@@ -60,155 +60,184 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
 
-      <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource RaisedSurfaceBrush}">
-        <StackPanel>
-          <TextBlock FontSize="18"
-                     FontWeight="SemiBold"
-                     Foreground="{StaticResource ContentHeadingBrush}"
-                     Text="Sağlık ve performans testi" />
-          <TextBlock Margin="0,10,0,0"
-                     TextWrapping="Wrap"
-                     Foreground="{StaticResource ContentTextBrush}"
-                     Text="Seçilen sürücü için sağlık özetini inceleyebilir, sıralı okuma-yazma ve 4K rastgele testleri çalıştırabilirsiniz." />
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="1.2*" />
+          <ColumnDefinition Width="1*" />
+        </Grid.ColumnDefinitions>
 
-          <Grid Margin="0,16,0,0">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="2*" />
-              <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+        <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource RaisedSurfaceBrush}">
+          <StackPanel>
+            <TextBlock FontSize="18"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource ContentHeadingBrush}"
+                       Text="Seçili disk özeti" />
+            <TextBlock Margin="0,14,0,0"
+                       Foreground="{StaticResource ContentMutedTextBrush}"
+                       Text="Sürücü" />
+            <ComboBox Margin="0,8,0,0"
+                      ItemsSource="{Binding Snapshot.Disks}"
+                      SelectedItem="{Binding SelectedBenchmarkDisk}"
+                      ItemTemplate="{StaticResource DiskComboItemTemplate}" />
 
-            <StackPanel Margin="0,0,12,0">
-              <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Sürücü" />
-              <ComboBox Margin="0,8,0,0"
-                        ItemsSource="{Binding Snapshot.Disks}"
-                        SelectedItem="{Binding SelectedBenchmarkDisk}"
-                        ItemTemplate="{StaticResource DiskComboItemTemplate}" />
-            </StackPanel>
-
-            <StackPanel Grid.Column="1">
-              <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Test profili" />
-              <ComboBox Margin="0,8,0,0"
-                        ItemsSource="{Binding BenchmarkProfiles}"
-                        SelectedItem="{Binding SelectedBenchmarkProfile}"
-                        ItemTemplate="{StaticResource TitleDescriptionComboItemTemplate}" />
-            </StackPanel>
-          </Grid>
-
-          <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
-            <Button Width="190"
-                    Height="44"
-                    Command="{Binding StartBenchmarkCommand}"
-                    Content="Performans testini başlat"
-                    Style="{StaticResource PrimaryActionButtonStyle}" />
-            <Button Width="120"
-                    Height="44"
-                    Margin="12,0,0,0"
-                    Command="{Binding CancelBenchmarkCommand}"
-                    Content="İptal et"
-                    Style="{StaticResource SecondaryActionButtonStyle}" />
-          </StackPanel>
-
-          <TextBlock Margin="0,14,0,0"
-                     TextWrapping="Wrap"
-                     Foreground="{StaticResource ContentMutedTextBrush}"
-                     Text="{Binding BenchmarkProgressSummary}" />
-          <ProgressBar Margin="0,10,0,0"
-                       Height="14"
-                       Minimum="0"
-                       Maximum="100"
-                       Value="{Binding BenchmarkProgressPercent, Mode=OneWay}" />
-          <TextBlock Margin="0,8,0,0"
-                     Foreground="{StaticResource ContentMutedTextBrush}"
-                     Text="{Binding BenchmarkProgressDetail}" />
-
-          <Border Margin="0,16,0,0"
-                  Padding="14"
-                  CornerRadius="18"
-                  Background="{StaticResource SubtlePanelBrush}"
-                  BorderBrush="{StaticResource CardBorderBrush}"
-                  BorderThickness="1">
-            <StackPanel>
-              <Grid>
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                  <RowDefinition Height="Auto" />
-                  <RowDefinition Height="Auto" />
-                  <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Durum" />
-                <TextBlock Grid.Column="1"
-                           Foreground="{StaticResource ContentMutedTextBrush}"
-                           Text="Sıralı okuma / yazma" />
-                <TextBlock Grid.Column="2"
-                           Foreground="{StaticResource ContentMutedTextBrush}"
-                           Text="4K rastgele okuma / yazma" />
-
-                <TextBlock Grid.Row="1"
-                           Margin="0,6,0,0"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource ContentHeadingBrush}"
-                           Text="{Binding LastBenchmarkResult.StatusLabel, TargetNullValue=Henüz test sonucu yok}" />
-                <TextBlock Grid.Row="1"
-                           Grid.Column="1"
-                           Margin="0,6,0,0"
-                           Foreground="{StaticResource ContentHeadingBrush}"
-                           Text="{Binding LastBenchmarkResult.SequentialReadLabel, TargetNullValue=-}" />
-                <TextBlock Grid.Row="1"
-                           Grid.Column="2"
-                           Margin="0,6,0,0"
-                           Foreground="{StaticResource ContentHeadingBrush}"
-                           Text="{Binding LastBenchmarkResult.RandomReadLabel, TargetNullValue=-}" />
-
-                <TextBlock Grid.Row="2"
-                           Margin="0,6,0,0"
-                           TextWrapping="Wrap"
-                           Foreground="{StaticResource ContentTextBrush}"
-                           Text="{Binding LastBenchmarkResult.Summary, TargetNullValue=Test tamamlandığında özet burada görünür.}" />
-                <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,6,0,0">
-                  <TextBlock Foreground="{StaticResource ContentTextBrush}"
-                             Text="{Binding LastBenchmarkResult.SequentialWriteLabel, TargetNullValue=-}" />
-                  <TextBlock Margin="0,4,0,0"
-                             Foreground="{StaticResource ContentMutedTextBrush}"
-                             Text="{Binding LastBenchmarkResult.TestFileSizeLabel, TargetNullValue=-}" />
-                </StackPanel>
-                <StackPanel Grid.Row="2" Grid.Column="2" Margin="0,6,0,0">
-                  <TextBlock Foreground="{StaticResource ContentTextBrush}"
-                             Text="{Binding LastBenchmarkResult.RandomWriteLabel, TargetNullValue=-}" />
-                  <TextBlock Margin="0,4,0,0"
-                             Foreground="{StaticResource ContentMutedTextBrush}"
-                             Text="{Binding LastBenchmarkResult.RandomReadIopsLabel, TargetNullValue=-}" />
-                  <TextBlock Margin="0,4,0,0"
-                             Foreground="{StaticResource ContentMutedTextBrush}"
-                             Text="{Binding LastBenchmarkResult.RandomWriteIopsLabel, TargetNullValue=-}" />
-                </StackPanel>
-              </Grid>
-
-              <ItemsControl Margin="0,12,0,0"
-                            ItemsSource="{Binding LastBenchmarkResult.Notes}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate>
-                    <TextBlock Margin="0,0,0,8"
-                               TextWrapping="Wrap"
+            <Border Margin="0,16,0,0"
+                    Padding="18"
+                    CornerRadius="18"
+                    Background="{StaticResource SubtlePanelBrush}"
+                    BorderBrush="{StaticResource CardBorderBrush}"
+                    BorderThickness="1">
+              <StackPanel>
+                <DockPanel>
+                  <StackPanel DockPanel.Dock="Left">
+                    <TextBlock FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource ContentHeadingBrush}"
+                               Text="{Binding SelectedBenchmarkDisk.Name, TargetNullValue=Sürücü seçin}" />
+                    <TextBlock Margin="0,6,0,0"
                                Foreground="{StaticResource ContentMutedTextBrush}"
-                               Text="{Binding}" />
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+                               Text="{Binding SelectedBenchmarkDisk.DeviceModel, TargetNullValue=-}" />
+                  </StackPanel>
+                  <Border DockPanel.Dock="Right"
+                          Padding="10,6"
+                          CornerRadius="12"
+                          Background="{StaticResource AccentSoftBrush}">
+                    <TextBlock Foreground="{StaticResource AccentBrush}"
+                               Text="{Binding SelectedBenchmarkDisk.HealthLabel, TargetNullValue=-}" />
+                  </Border>
+                </DockPanel>
+
+                <Grid Margin="0,16,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+
+                  <StackPanel>
+                    <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Sağlık puanı" />
+                    <TextBlock Margin="0,6,0,0"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource ContentHeadingBrush}"
+                               Text="{Binding SelectedBenchmarkDisk.HealthScoreLabel, TargetNullValue=-}" />
+                  </StackPanel>
+
+                  <StackPanel Grid.Column="1">
+                    <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Sıcaklık" />
+                    <TextBlock Margin="0,6,0,0"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource ContentHeadingBrush}"
+                               Text="{Binding SelectedBenchmarkDisk.TemperatureLabel, TargetNullValue=-}" />
+                  </StackPanel>
+
+                  <StackPanel Grid.Column="2">
+                    <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Tür" />
+                    <TextBlock Margin="0,6,0,0"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource ContentHeadingBrush}"
+                               Text="{Binding SelectedBenchmarkDisk.MediaType, TargetNullValue=-}" />
+                  </StackPanel>
+                </Grid>
+
+                <ItemsControl Margin="0,16,0,0"
+                              ItemsSource="{Binding SelectedBenchmarkDisk.HealthHighlights}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Margin="0,0,0,8"
+                                 TextWrapping="Wrap"
+                                 Foreground="{StaticResource ContentTextBrush}"
+                                 Text="{Binding}" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}">
+          <StackPanel>
+            <TextBlock FontSize="18"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource ContentHeadingBrush}"
+                       Text="Benchmark" />
+            <TextBlock Margin="0,10,0,0"
+                       TextWrapping="Wrap"
+                       Foreground="{StaticResource ContentTextBrush}"
+                       Text="CrystalDiskMark benzeri görünümle sıralı ve 4K Q1T1 sonuçlarını alın." />
+
+            <ComboBox Margin="0,16,0,0"
+                      ItemsSource="{Binding BenchmarkProfiles}"
+                      SelectedItem="{Binding SelectedBenchmarkProfile}"
+                      ItemTemplate="{StaticResource TitleDescriptionComboItemTemplate}" />
+
+            <StackPanel Margin="0,16,0,0" Orientation="Horizontal">
+              <Button Width="170"
+                      Height="44"
+                      Command="{Binding StartBenchmarkCommand}"
+                      Content="Testi başlat"
+                      Style="{StaticResource PrimaryActionButtonStyle}" />
+              <Button Width="110"
+                      Height="44"
+                      Margin="12,0,0,0"
+                      Command="{Binding CancelBenchmarkCommand}"
+                      Content="İptal et"
+                      Style="{StaticResource SecondaryActionButtonStyle}" />
             </StackPanel>
-          </Border>
-        </StackPanel>
-      </Border>
+
+            <ProgressBar Margin="0,16,0,0"
+                         Height="16"
+                         Minimum="0"
+                         Maximum="100"
+                         Value="{Binding BenchmarkProgressPercent, Mode=OneWay}" />
+            <TextBlock Margin="0,10,0,0"
+                       Foreground="{StaticResource ContentMutedTextBrush}"
+                       Text="{Binding BenchmarkProgressSummary}" />
+            <TextBlock Margin="0,6,0,0"
+                       Foreground="{StaticResource ContentMutedTextBrush}"
+                       Text="{Binding BenchmarkProgressDetail}" />
+
+            <UniformGrid Margin="0,18,0,0" Columns="2">
+              <Border Margin="0,0,10,10" Padding="14" CornerRadius="18" Background="{StaticResource SubtlePanelBrush}">
+                <StackPanel>
+                  <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="SEQ1M Q1T1 Read" />
+                  <TextBlock Margin="0,10,0,0" FontSize="26" FontWeight="Bold" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding LastBenchmarkResult.SequentialReadLabel, TargetNullValue=-}" />
+                </StackPanel>
+              </Border>
+              <Border Margin="0,0,0,10" Padding="14" CornerRadius="18" Background="{StaticResource SubtlePanelBrush}">
+                <StackPanel>
+                  <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="SEQ1M Q1T1 Write" />
+                  <TextBlock Margin="0,10,0,0" FontSize="26" FontWeight="Bold" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding LastBenchmarkResult.SequentialWriteLabel, TargetNullValue=-}" />
+                </StackPanel>
+              </Border>
+              <Border Margin="0,0,10,0" Padding="14" CornerRadius="18" Background="{StaticResource SubtlePanelBrush}">
+                <StackPanel>
+                  <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="RND4K Q1T1 Read" />
+                  <TextBlock Margin="0,10,0,0" FontSize="26" FontWeight="Bold" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding LastBenchmarkResult.RandomReadLabel, TargetNullValue=-}" />
+                  <TextBlock Margin="0,6,0,0" Foreground="{StaticResource ContentMutedTextBrush}" Text="{Binding LastBenchmarkResult.RandomReadIopsLabel, TargetNullValue=-}" />
+                </StackPanel>
+              </Border>
+              <Border Margin="0,0,0,0" Padding="14" CornerRadius="18" Background="{StaticResource SubtlePanelBrush}">
+                <StackPanel>
+                  <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="RND4K Q1T1 Write" />
+                  <TextBlock Margin="0,10,0,0" FontSize="26" FontWeight="Bold" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding LastBenchmarkResult.RandomWriteLabel, TargetNullValue=-}" />
+                  <TextBlock Margin="0,6,0,0" Foreground="{StaticResource ContentMutedTextBrush}" Text="{Binding LastBenchmarkResult.RandomWriteIopsLabel, TargetNullValue=-}" />
+                </StackPanel>
+              </Border>
+            </UniformGrid>
+
+            <TextBlock Margin="0,16,0,0"
+                       TextWrapping="Wrap"
+                       Foreground="{StaticResource ContentTextBrush}"
+                       Text="{Binding LastBenchmarkResult.Summary, TargetNullValue=Henüz test sonucu yok.}" />
+          </StackPanel>
+        </Border>
+      </Grid>
 
       <TextBlock Margin="0,10,0,16"
                  FontSize="18"
                  FontWeight="SemiBold"
                  Foreground="{StaticResource ContentHeadingBrush}"
-                 Text="Bağlı sürücüler" />
+                 Text="Bağlı diskler" />
 
       <ItemsControl ItemsSource="{Binding Snapshot.Disks}">
         <ItemsControl.ItemTemplate>
@@ -227,36 +256,29 @@
                   </StackPanel>
 
                   <Border DockPanel.Dock="Right"
-                          Padding="10,6"
+                          Padding="12,8"
                           CornerRadius="12"
                           Background="{StaticResource AccentSoftBrush}">
-                    <TextBlock Foreground="{StaticResource AccentBrush}"
-                               Text="{Binding HealthLabel}" />
+                    <StackPanel>
+                      <TextBlock HorizontalAlignment="Center" Foreground="{StaticResource AccentBrush}" Text="{Binding HealthLabel}" />
+                      <TextBlock Margin="0,4,0,0" HorizontalAlignment="Center" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding HealthScoreLabel}" />
+                    </StackPanel>
                   </Border>
                 </DockPanel>
 
                 <WrapPanel Margin="0,12,0,0">
-                  <Border Margin="0,0,10,8"
-                          Padding="10,6"
-                          CornerRadius="12"
-                          Background="{StaticResource TagSurfaceBrush}">
-                    <TextBlock Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding FileSystem}" />
+                  <Border Margin="0,0,10,8" Padding="10,6" CornerRadius="12" Background="{StaticResource TagSurfaceBrush}">
+                    <TextBlock Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding MediaType}" />
                   </Border>
-                  <Border Margin="0,0,10,8"
-                          Padding="10,6"
-                          CornerRadius="12"
-                          Background="{StaticResource TagSurfaceBrush}">
+                  <Border Margin="0,0,10,8" Padding="10,6" CornerRadius="12" Background="{StaticResource TagSurfaceBrush}">
                     <TextBlock Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding ConnectionType}" />
                   </Border>
-                  <Border Margin="0,0,10,8"
-                          Padding="10,6"
-                          CornerRadius="12"
-                          Background="{StaticResource TagSurfaceBrush}">
-                    <TextBlock Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding MediaType}" />
+                  <Border Margin="0,0,10,8" Padding="10,6" CornerRadius="12" Background="{StaticResource TagSurfaceBrush}">
+                    <TextBlock Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding TemperatureLabel}" />
                   </Border>
                 </WrapPanel>
 
-                <Grid Margin="0,10,0,0">
+                <Grid Margin="0,12,0,0">
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="1.4*" />
                     <ColumnDefinition Width="*" />
@@ -266,57 +288,24 @@
 
                   <StackPanel>
                     <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Marka / model" />
-                    <TextBlock Margin="0,4,0,0"
-                               TextWrapping="Wrap"
-                               Foreground="{StaticResource ContentHeadingBrush}"
-                               Text="{Binding DeviceModel}" />
+                    <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding DeviceModel}" />
                   </StackPanel>
-
                   <StackPanel Grid.Column="1">
-                    <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Sağlık" />
-                    <TextBlock Margin="0,4,0,0"
-                               Foreground="{StaticResource ContentHeadingBrush}"
-                               Text="{Binding HealthLabel}" />
-                  </StackPanel>
-
-                  <StackPanel Grid.Column="2">
                     <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Toplam" />
-                    <TextBlock Margin="0,4,0,0"
-                               Foreground="{StaticResource ContentHeadingBrush}"
-                               Text="{Binding CapacityLabel}" />
+                    <TextBlock Margin="0,4,0,0" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding CapacityLabel}" />
                   </StackPanel>
-
-                  <StackPanel Grid.Column="3">
+                  <StackPanel Grid.Column="2">
                     <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Boş" />
-                    <TextBlock Margin="0,4,0,0"
-                               Foreground="{StaticResource ContentHeadingBrush}"
-                               Text="{Binding FreeLabel}" />
+                    <TextBlock Margin="0,4,0,0" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding FreeLabel}" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="3">
+                    <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Seri no" />
+                    <TextBlock Margin="0,4,0,0" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding SerialNumber}" />
                   </StackPanel>
                 </Grid>
 
-                <Grid Margin="0,10,0,0">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                  </Grid.ColumnDefinitions>
-
-                  <StackPanel>
-                    <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Kullanılan" />
-                    <TextBlock Margin="0,4,0,0"
-                               Foreground="{StaticResource ContentHeadingBrush}"
-                               Text="{Binding UsedLabel}" />
-                  </StackPanel>
-
-                  <StackPanel Grid.Column="1">
-                    <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Yerleşim" />
-                    <TextBlock Margin="0,4,0,0"
-                               Foreground="{StaticResource ContentHeadingBrush}"
-                               Text="{Binding LayoutLabel}" />
-                  </StackPanel>
-                </Grid>
-
-                <ProgressBar Margin="0,12,0,0"
-                             Height="12"
+                <ProgressBar Margin="0,14,0,0"
+                             Height="16"
                              Minimum="0"
                              Maximum="100"
                              Value="{Binding UsagePercent}" />
@@ -325,56 +314,74 @@
                            TextWrapping="Wrap"
                            Foreground="{StaticResource ContentTextBrush}"
                            Text="{Binding WarningSummary}" />
+
+                <Expander Margin="0,16,0,0"
+                          Background="{StaticResource RaisedSurfaceBrush}"
+                          BorderBrush="{StaticResource CardBorderBrush}"
+                          BorderThickness="1"
+                          Padding="14"
+                          Header="Sağlık ayrıntıları"
+                          IsExpanded="False">
+                  <StackPanel Margin="0,12,0,0">
+                    <ItemsControl ItemsSource="{Binding HealthDetails}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="180" />
+                              <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="{Binding Label}" />
+                            <TextBlock Grid.Column="1" TextWrapping="Wrap" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding Value}" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Margin="0,12,0,0"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource ContentHeadingBrush}"
+                               Text="SMART öznitelikleri" />
+
+                    <ItemsControl Margin="0,10,0,0" ItemsSource="{Binding SmartAttributes}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <Border Margin="0,0,0,8"
+                                  Padding="12"
+                                  CornerRadius="14"
+                                  Background="{StaticResource SubtlePanelBrush}"
+                                  BorderBrush="{StaticResource CardBorderBrush}"
+                                  BorderThickness="1">
+                            <Grid>
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="64" />
+                                <ColumnDefinition Width="2*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="1.2*" />
+                              </Grid.ColumnDefinitions>
+                              <TextBlock Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding Id}" />
+                              <TextBlock Grid.Column="1" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding Name}" />
+                              <TextBlock Grid.Column="2" Foreground="{StaticResource ContentTextBrush}" Text="{Binding CurrentValue}" />
+                              <TextBlock Grid.Column="3" Foreground="{StaticResource ContentTextBrush}" Text="{Binding WorstValue}" />
+                              <TextBlock Grid.Column="4" Foreground="{StaticResource ContentTextBrush}" Text="{Binding ThresholdValue}" />
+                              <StackPanel Grid.Column="5">
+                                <TextBlock Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding RawValue}" />
+                                <TextBlock Margin="0,4,0,0" Foreground="{StaticResource ContentMutedTextBrush}" Text="{Binding StatusLabel}" />
+                              </StackPanel>
+                            </Grid>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </Expander>
               </StackPanel>
             </Border>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
-
-      <Expander Margin="0,8,0,14"
-                Background="{StaticResource RaisedSurfaceBrush}"
-                BorderBrush="{StaticResource CardBorderBrush}"
-                BorderThickness="1"
-                Padding="16"
-                Header="Gelişmiş sistem bilgileri"
-                IsExpanded="False">
-        <StackPanel Margin="0,12,0,0">
-          <TextBlock Foreground="{StaticResource ContentMutedTextBrush}" Text="Bilgisayar adı" />
-          <TextBlock Margin="0,4,0,0" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding Snapshot.System.MachineName}" />
-          <TextBlock Margin="0,12,0,0" Foreground="{StaticResource ContentMutedTextBrush}" Text="İşletim sistemi" />
-          <TextBlock Margin="0,4,0,0" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding Snapshot.System.OperatingSystem}" />
-          <TextBlock Margin="0,12,0,0" Foreground="{StaticResource ContentMutedTextBrush}" Text="Mimari" />
-          <TextBlock Margin="0,4,0,0" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding Snapshot.System.Architecture}" />
-          <TextBlock Margin="0,12,0,0" Foreground="{StaticResource ContentMutedTextBrush}" Text=".NET çalışma zamanı" />
-          <TextBlock Margin="0,4,0,0" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding Snapshot.System.Framework}" />
-          <TextBlock Margin="0,12,0,0" Foreground="{StaticResource ContentMutedTextBrush}" Text="Oturum" />
-          <TextBlock Margin="0,4,0,0" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding Snapshot.System.CurrentUser}" />
-          <TextBlock Margin="0,12,0,0" Foreground="{StaticResource ContentMutedTextBrush}" Text="Sistem sürücüsü" />
-          <TextBlock Margin="0,4,0,0" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding Snapshot.System.SystemDrive}" />
-          <TextBlock Margin="0,12,0,0" Foreground="{StaticResource ContentMutedTextBrush}" Text="Açık kalma süresi" />
-          <TextBlock Margin="0,4,0,0" Foreground="{StaticResource ContentHeadingBrush}" Text="{Binding Snapshot.System.UptimeLabel}" />
-        </StackPanel>
-      </Expander>
-
-      <Border Style="{StaticResource CardBorderStyle}">
-        <StackPanel>
-          <TextBlock FontSize="18"
-                     FontWeight="SemiBold"
-                     Foreground="{StaticResource ContentHeadingBrush}"
-                     Text="Notlar" />
-          <ItemsControl Margin="0,12,0,0"
-                        ItemsSource="{Binding Snapshot.Notes}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <TextBlock Margin="0,0,0,10"
-                           TextWrapping="Wrap"
-                           Foreground="{StaticResource ContentTextBrush}"
-                           Text="{Binding}" />
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </StackPanel>
-      </Border>
     </StackPanel>
   </ScrollViewer>
 </UserControl>
